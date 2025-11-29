@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kacky Reloaded 6 - Pro Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+    <style>
+        :root { --bg: #0f0f13; --panel: #1b1b22; --text: #eee; --accent: #ff0055; --border: #333; --success: #00d26a; --blue: #00d2ff; --danger: #ff4444; --warning: #ffaa00; }
+        body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: var(--bg); color: var(--text); margin: 0; padding: 0; display: flex; height: 100vh; overflow: hidden; }
+        
+        /* LAYOUT */
+        .sidebar { width: 320px; background: var(--panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 15px; overflow-y: auto; flex-shrink: 0; z-index: 2; }
+        .main { flex: 1; display: flex; flex-direction: column; padding: 20px; gap: 15px; overflow-y: auto; position: relative; }
+
+        /* HEADER */
+        .header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+        .app-title { margin: 0; color: var(--accent); font-size: 1.3rem; letter-spacing: 1px; }
+        .countdown-box { background: #2a2a35; padding: 5px 15px; border-radius: 20px; border: 1px solid #444; font-variant-numeric: tabular-nums; font-size: 0.9rem; color: #aaa; }
+        .countdown-time { color: #fff; font-weight: bold; margin-left: 5px; }
+
+        /* BUTTONS */
+        .btn-group { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
+        .btn { padding: 10px; border-radius: 6px; font-weight: 600; border: none; cursor: pointer; transition: all 0.2s; text-align: center; color: #000; font-size: 0.85rem; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        .btn:hover { transform: translateY(-1px); filter: brightness(1.1); }
+        .btn:active { transform: translateY(0); }
+        .btn-fetch { background: var(--warning); }
+        .btn-add { background: var(--blue); }
+        
+        /* PLAYER LIST */
+        .player-list { display: flex; flex-direction: column; gap: 10px; }
+        .player-card { background: #25252e; border-radius: 6px; border: 1px solid var(--border); overflow: hidden; transition: 0.3s; position: relative; }
+        .player-card.has-data { border-color: #444; }
+        
+        .card-header { padding: 10px; display: flex; justify-content: space-between; align-items: flex-start; background: rgba(255,255,255,0.03); }
+        .p-info { display: flex; flex-direction: column; gap: 4px; }
+        .p-name { font-weight: bold; font-size: 0.95rem; color: #fff; }
+        .p-meta { font-size: 0.7rem; color: #666; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+        
+        /* Badges */
+        .p-avg { color: #000; background: var(--blue); padding: 1px 5px; border-radius: 3px; font-weight: bold; font-size: 0.75rem; display:none; }
+        .p-avg.visible { display: inline-block; }
+        .p-id { background: #333; color: #888; padding: 1px 4px; border-radius: 3px; }
+
+        .p-actions { display: flex; align-items: center; gap: 8px; }
+        .p-stat { font-weight: bold; font-size: 0.9rem; color: var(--success); }
+        .btn-icon { background: transparent; border: none; color: #555; cursor: pointer; font-size: 1rem; padding: 2px; transition: 0.2s; }
+        .btn-icon:hover { color: #fff; }
+        .btn-del:hover { color: var(--danger); }
+
+        /* Hidden Input */
+        .data-input { width: 100%; height: 60px; background: #111; color: #aaa; border: none; padding: 8px; font-family: monospace; font-size: 0.7rem; border-top: 1px solid var(--border); display: none; }
+        .data-input.show { display: block; }
+
+        /* CONTROLS */
+        .controls-row { display: flex; flex-wrap: wrap; gap: 12px; background: var(--panel); padding: 12px 20px; border-radius: 8px; border: 1px solid var(--border); align-items: center; }
+        .cb-item { display: flex; align-items: center; gap: 6px; cursor: pointer; opacity: 0.4; transition: 0.2s; font-size: 0.9rem; user-select: none; background: rgba(255,255,255,0.05); padding: 4px 10px; border-radius: 20px; }
+        .cb-item:hover { opacity: 0.8; background: rgba(255,255,255,0.1); }
+        .cb-item.active { opacity: 1; font-weight: bold; background: rgba(255,255,255,0.15); box-shadow: 0 0 10px rgba(0,0,0,0.3); }
+        .cb-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+        /* CHART */
+        .chart-box { background: var(--panel); border-radius: 8px; padding: 15px; height: 500px; position: relative; border: 1px solid var(--border); cursor: crosshair; }
+
+        /* DETAILS */
+        .details-box { background: var(--panel); border-radius: 8px; padding: 20px; flex: 1; min-height: 200px; border: 1px solid var(--border); }
+        .details-title { border-bottom: 1px solid var(--border); margin-bottom: 15px; padding-bottom: 10px; font-size: 1.1rem; color: #fff; }
+        
+        .map-badge { 
+            background: #2b2b36; color: #ccc; padding: 6px 12px; border-radius: 4px; margin: 4px; 
+            display: inline-flex; align-items: center; gap: 8px; cursor: pointer; border: 1px solid #444; font-size: 0.85rem; transition: 0.2s; 
+        }
+        .map-badge:hover { background: var(--accent); color: #fff; border-color: var(--accent); transform: translateY(-2px); }
+        .ts { font-family: monospace; font-size: 0.85em; opacity: 0.6; background: rgba(0,0,0,0.3); padding: 2px 4px; border-radius: 3px; color: var(--blue); }
+
+        .loading-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 100; display: flex; justify-content: center; align-items: center; color: white; font-size: 1.5rem; display: none; backdrop-filter: blur(3px); }
+        .spinner { width: 40px; height: 40px; border: 4px solid #fff; border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite; margin-right: 15px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+<div class="loading-overlay" id="loader">
+    <div class="spinner"></div> Fetching Live Data...
+</div>
+
+<div class="sidebar">
+    <div class="header-row">
+        <h2 class="app-title">Kacky Tracker</h2>
+    </div>
+    
+    <div class="btn-group">
+        <button id="btnFetch" class="btn btn-fetch" onclick="fetchLiveStats(true)">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+            Fetch Live Data
+        </button>
+        <button class="btn btn-add" onclick="addCustomPlayer()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            Add Player
+        </button>
+    </div>
+
+    <div id="playerList" class="player-list"></div>
+</div>
+
+<div class="main">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div class="controls-row" id="checkboxContainer" style="flex:1; margin-right:15px;"></div>
+        <div class="countdown-box">
+            Event Ends: <span id="timer" class="countdown-time">Loading...</span>
+        </div>
+    </div>
+
+    <div class="chart-box">
+        <canvas id="kackyChart"></canvas>
+    </div>
+
+    <div class="details-box">
+        <div class="details-title" id="detailsHeader">Click graph to view daily details</div>
+        <div id="detailsList"></div>
+    </div>
+</div>
+
+<script>
+    // --- CONFIG ---
+    const KACKY_END_DATE = new Date("2025-12-01T18:00:00Z");
+    const DEFAULT_PLAYERS = [
+        { id: 0, kid: 29565, name: "SSanoTM", color: "#FF0055" },
+        { id: 1, kid: 814, name: "LinkMaxTm", color: "#00CCFF" },
+        { id: 2, kid: 25376, name: "iiHugo", color: "#00FF99" },
+        { id: 3, kid: 6789, name: "Samifying", color: "#FFFF00" },
+        { id: 4, kid: 23074, name: "SileenzZ_", color: "#FF9900" },
+        { id: 5, kid: 14, name: "Tekky..", color: "#CC00FF" },
+        { id: 6, kid: 890, name: "nonickiNg", color: "#FF00CC" },
+        { id: 7, kid: 23083, name: "zetos.", color: "#00FF00" },
+        { id: 8, kid: 33369, name: "mikmos.", color: "#FFFFFF" },
+        { id: 9, kid: 166, name: "shieldbandit", color: "#8888FF" }
+    ];
+
+    // --- STATE ---
+    let players = [];
+    let playerData = {}; 
+    let chartInstance = null;
+    let selectedDay = -1;
+
+    // --- INIT ---
+    function init() {
+        startTimer();
+        initChart();
+
+        // Load Local Config (Instant UI)
+        const savedConfig = localStorage.getItem('kacky_pro_config');
+        players = savedConfig ? JSON.parse(savedConfig) : JSON.parse(JSON.stringify(DEFAULT_PLAYERS));
+
+        const savedData = localStorage.getItem('kacky_pro_data');
+        if (savedData) {
+            const parsedData = JSON.parse(savedData);
+            Object.keys(parsedData).forEach(pid => {
+                if (parsedData[pid].finishes) {
+                    parsedData[pid].finishes.forEach(f => f.dateObj = new Date(f.isoDate));
+                }
+            });
+            playerData = parsedData;
+        }
+
+        const savedDay = localStorage.getItem('kacky_selected_day');
+        if(savedDay) selectedDay = parseInt(savedDay);
+
+        sortPlayers();
+        renderAll();
+        if(selectedDay !== -1) showDetails(selectedDay);
+
+        // AUTO FETCH ON LOAD (Unless View Only)
+        if(!PRELOADED_STATE) {
+            // Delay slightly to allow UI to settle
+            setTimeout(() => fetchLiveStats(false), 500);
+        }
+    }
+
+    // --- LOGIC ---
+    function sortPlayers() {
+        players.sort((a, b) => {
+            const dataA = playerData[a.id] || { finishes: [], avgRank: 99999 };
+            const dataB = playerData[b.id] || { finishes: [], avgRank: 99999 };
+            if (dataA.finishes.length !== dataB.finishes.length) return dataB.finishes.length - dataA.finishes.length;
+            const avgA = dataA.avgRank ? parseFloat(dataA.avgRank) : 99999;
+            const avgB = dataB.avgRank ? parseFloat(dataB.avgRank) : 99999;
+            return avgA - avgB;
+        });
+    }
+
+    function renderAll() {
+        const list = document.getElementById('playerList');
+        const toggles = document.getElementById('checkboxContainer');
+        const savedToggles = JSON.parse(localStorage.getItem('kacky_view_toggles') || '[]');
+
+        list.innerHTML = '';
+        toggles.innerHTML = '';
+
+        players.forEach(p => {
+            const data = playerData[p.id] || { finishes: [], avgRank: null };
+            const count = data.finishes.length;
+            const avgDisplay = data.avgRank ? `Avg: ${data.avgRank}` : '';
+            const kidDisplay = p.kid ? `ID: ${p.kid}` : '';
+
+            const card = document.createElement('div');
+            card.className = `player-card ${count > 0 ? 'has-data' : ''}`;
+            card.innerHTML = `
+                <div class="card-header">
+                    <div class="p-info">
+                        <span class="p-name" style="color:${p.color}">${p.name}</span>
+                        <div class="p-meta">
+                            <span class="p-avg ${avgDisplay ? 'visible' : ''}">${avgDisplay}</span>
+                            <span class="p-id">${kidDisplay}</span>
+                        </div>
+                    </div>
+                    <div class="p-actions">
+                        <span class="p-stat">${count} Fins</span>
+                        <button class="btn-icon" onclick="toggleEdit(${p.id})" title="Manual Data">&#9998;</button>
+                        <button class="btn-icon btn-del" onclick="deletePlayer(${p.id})" title="Remove">&times;</button>
+                    </div>
+                </div>
+                <textarea id="input-${p.id}" class="data-input" placeholder="Paste source code here..." oninput="manualParse(${p.id})"></textarea>
+            `;
+            list.appendChild(card);
+
+            const label = document.createElement('label');
+            label.className = 'cb-item';
+            label.id = `lbl-${p.id}`;
+            const isChecked = savedToggles.includes(p.id) || (savedToggles.length === 0 && p.id < 5);
+            
+            label.innerHTML = `
+                <div class="cb-dot" style="background:${p.color}"></div>
+                <input type="checkbox" id="cb-${p.id}" style="display:none" ${isChecked ? 'checked' : ''}>
+                ${p.name}
+            `;
+            label.onclick = (e) => { setTimeout(() => { updateVisuals(); saveState(); }, 10); };
+            
+            if(isChecked) label.classList.add('active');
+            toggles.appendChild(label);
+        });
+        updateChart();
+    }
+
+    function updateVisuals() {
+        players.forEach(p => {
+            const cb = document.getElementById(`cb-${p.id}`);
+            const lbl = document.getElementById(`lbl-${p.id}`);
+            if(cb && lbl) {
+                if(cb.checked) lbl.classList.add('active'); else lbl.classList.remove('active');
+            }
+        });
+        updateChart();
+        if(selectedDay !== -1) showDetails(selectedDay);
+    }
+
+    // --- FETCH & PARSE ---
+    async function fetchLiveStats(isManualTrigger = false) {
+        const loader = document.getElementById('loader');
+        if(isManualTrigger) loader.style.display = 'flex'; // Only block screen if user clicked button
+        
+        // Update button text for feedback
+        const btn = document.getElementById('btnFetch');
+        const prevText = btn.innerHTML;
+        btn.innerHTML = "Fetching...";
+
+        let success = 0;
+
+        const promises = players.map(async (p) => {
+            if (!p.kid) return;
+            const targetUrl = `https://kacky.gg/player/${p.kid}?eventId=11`;
+            const proxyUrl = `https://corsproxy.io/?url=${encodeURIComponent(targetUrl)}&_t=${Date.now()}`;
+
+            try {
+                const res = await fetch(proxyUrl);
+                if (!res.ok) throw new Error("Fetch Error");
+                const html = await res.text();
+                parseData(p.id, html);
+                success++;
+            } catch (err) {
+                // Backup Proxy
+                try {
+                    const backupUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}&disableCache=true`;
+                    const res2 = await fetch(backupUrl);
+                    const data2 = await res2.json();
+                    if(data2.contents) { parseData(p.id, data2.contents); success++; }
+                } catch(e2) {}
+            }
+        });
+
+        await Promise.all(promises);
+        
+        loader.style.display = 'none';
+        btn.innerHTML = prevText;
+
+        if (success > 0) {
+            sortPlayers(); renderAll(); saveState();
+        } else if(isManualTrigger) {
+            alert("Fetch failed. Please paste source code manually.");
+        }
+    }
+
+    function manualParse(id) {
+        const val = document.getElementById(`input-${id}`).value;
+        parseData(id, val);
+        sortPlayers(); renderAll(); saveState();
+    }
+
+    function parseData(id, text) {
+        let finishes = [];
+        let avgRank = null;
+        const playerKid = players.find(p => p.id === id)?.kid;
+
+        // 1. EXTRACT AVERAGE RANK (Specific to Player ID)
+        if (playerKid) {
+            const rankRegex = new RegExp(`\\\\?"playerId\\\\?":\\s*${playerKid}.*?\\\\?"averageRankFinishedMaps\\\\?":\\s*([\\d\\.]+)`);
+            const match = text.match(rankRegex);
+            if (match) avgRank = parseFloat(match[1]).toFixed(1);
+        }
+        if (!avgRank) {
+             const match = text.match(/\\?"averageRankFinishedMaps\\?":\s*([\d\.]+)/);
+             if(match) avgRank = parseFloat(match[1]).toFixed(1);
+        }
+
+        // 2. EXTRACT MAPS
+        if (text.includes('self.__next_f') || text.includes('mapUid')) {
+            try {
+                const regex = /\\?"(?:mapNumber|number)\\?":\s*(\d+)[^}]*?\\?"(?:firstFinishedAt|createdAt)\\?":\s*\\?"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z)/g;
+                let m;
+                while ((m = regex.exec(text)) !== null) {
+                    const mapId = parseInt(m[1]);
+                    const isoDate = m[2];
+                    const d = new Date(isoDate);
+                    if (!isNaN(d) && d.getFullYear() === 2025 && d.getMonth() === 10) { 
+                        finishes.push({ map: mapId, dateObj: d, isoDate: isoDate, timeStr: d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) });
+                    }
+                }
+            } catch(e) {}
+        }
+
+        // Fallback Text
+        if (finishes.length === 0) {
+             const regex = /(3[7-9]\d|4[0-4]\d|450).*?(\d{1,5})\s(Nov|Dec)\s2025/g;
+             let m;
+             while ((m = regex.exec(text)) !== null) {
+                const mapId = parseInt(m[1]);
+                const day = parseInt(m[2].slice(-2)); 
+                const d = new Date(`2025-11-${day}T12:00:00Z`);
+                finishes.push({ map: mapId, dateObj: d, isoDate: d.toISOString(), timeStr: null });
+             }
+        }
+
+        const unique = [];
+        const seen = new Set();
+        finishes.forEach(f => { if(!seen.has(f.map)) { seen.add(f.map); unique.push(f); } });
+        unique.sort((a,b) => a.dateObj - b.dateObj);
+        playerData[id] = { finishes: unique, avgRank: avgRank };
+    }
+
+    // --- CHART ---
+    function initChart() {
+        const ctx = document.getElementById('kackyChart').getContext('2d');
+        chartInstance = new Chart(ctx, {
+            type: 'line',
+            data: { datasets: [] },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false, axis: 'x' },
+                scales: {
+                    x: { type: 'time', time: { unit: 'day', displayFormats: { day: 'MMM d' } }, min: '2025-11-01T18:00:00Z', max: '2025-12-01T00:00:00Z', grid: { color: '#333' } },
+                    y: { beginAtZero: true, max: 75, grid: { color: '#333' }, title: { display: true, text: 'Total Maps' } }
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { enabled: false, external: customTooltip }
+                },
+                onClick: (e, elements) => {
+                    const canvasPosition = Chart.helpers.getRelativePosition(e, chartInstance);
+                    const dataX = chartInstance.scales.x.getValueForPixel(canvasPosition.x);
+                    if (dataX) showDetails(new Date(dataX).getDate());
+                }
+            }
+        });
+    }
+
+    // Custom Tooltip Logic (Time Machine)
+    function customTooltip(context) {
+        const tooltipModel = context.tooltip;
+        let tooltipEl = document.getElementById('chartjs-tooltip');
+        if (!tooltipEl) {
+            tooltipEl = document.createElement('div');
+            tooltipEl.id = 'chartjs-tooltip';
+            tooltipEl.style.cssText = 'background:rgba(0,0,0,0.9); border:1px solid #555; border-radius:5px; color:#fff; pointer-events:none; position:absolute; transform:translate(-50%,0); transition:opacity .2s; z-index:100; padding:10px; font-size:12px;';
+            document.body.appendChild(tooltipEl);
+        }
+        if (tooltipModel.opacity === 0) { tooltipEl.style.opacity = 0; return; }
+
+        if (tooltipModel.body) {
+            const hoverTime = tooltipModel.dataPoints[0].parsed.x;
+            const dateStr = new Date(hoverTime).toLocaleString([], {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'});
+            let lines = [];
+            players.forEach(p => {
+                const cb = document.getElementById(`cb-${p.id}`);
+                if (cb && cb.checked && playerData[p.id]) {
+                    const fins = playerData[p.id].finishes;
+                    let count = 0;
+                    for(let i=0; i<fins.length; i++) { if(fins[i].dateObj.getTime() <= hoverTime) count++; else break; }
+                    lines.push({ name: p.name, count: count, color: p.color });
+                }
+            });
+            lines.sort((a, b) => b.count - a.count);
+            
+            let html = `<div style="font-weight:bold; border-bottom:1px solid #555; margin-bottom:5px; padding-bottom:3px;">${dateStr}</div>`;
+            lines.forEach(l => {
+                html += `<div style="display:flex; justify-content:space-between; gap:15px; align-items:center;">
+                    <span style="display:flex; align-items:center; gap:5px;"><span style="background:${l.color}; width:8px; height:8px; border-radius:50%;"></span>${l.name}</span>
+                    <span style="font-weight:bold;">${l.count}</span>
+                </div>`;
+            });
+            tooltipEl.innerHTML = html;
+        }
+        const pos = context.chart.canvas.getBoundingClientRect();
+        tooltipEl.style.opacity = 1;
+        tooltipEl.style.left = pos.left + window.pageXOffset + tooltipModel.caretX + 'px';
+        tooltipEl.style.top = pos.top + window.pageYOffset + tooltipModel.caretY + 'px';
+    }
+
+    function updateChart() {
+        const datasets = [];
+        players.forEach(p => {
+            const cb = document.getElementById(`cb-${p.id}`);
+            const data = playerData[p.id];
+            if (cb && cb.checked && data && data.finishes.length > 0) {
+                const points = [{ x: "2025-11-01T18:00:00Z", y: 0 }];
+                data.finishes.forEach((f, index) => points.push({ x: f.isoDate, y: index + 1 }));
+                points.push({ x: new Date().toISOString(), y: data.finishes.length });
+                datasets.push({ label: p.name, data: points, borderColor: p.color, backgroundColor: p.color, borderWidth: 2, pointRadius: 0, pointHoverRadius: 6, stepped: true });
+            }
+        });
+        chartInstance.data.datasets = datasets;
+        chartInstance.update();
+    }
+
+    // --- DETAILS ---
+    function showDetails(day) {
+        selectedDay = day;
+        localStorage.setItem('kacky_selected_day', day);
+        document.getElementById('detailsHeader').innerText = `Finishes on Nov ${day}`;
+        const list = document.getElementById('detailsList');
+        list.innerHTML = '';
+        let foundAny = false;
+
+        players.forEach(p => {
+            const cb = document.getElementById(`cb-${p.id}`);
+            const data = playerData[p.id];
+            if (cb && cb.checked && data) {
+                let dailyFins = data.finishes.filter(f => f.dateObj.getDate() === day);
+                dailyFins.sort((a, b) => a.dateObj - b.dateObj);
+                if (dailyFins.length > 0) {
+                    foundAny = true;
+                    const row = document.createElement('div');
+                    row.style.marginBottom = '15px';
+                    let html = `<div style="margin-bottom:5px"><strong style="color:${p.color}">${p.name}</strong> <span style="color:#666">(${dailyFins.length})</span></div><div style="display:flex; flex-wrap:wrap;">`;
+                    dailyFins.forEach(f => {
+                        const timeLabel = f.timeStr ? `<span class="ts">${f.timeStr}</span>` : '';
+                        html += `<div class="map-badge" onclick="openClip(${f.map})" title="Watch Clip">${timeLabel} <span>Map ${f.map}</span></div>`;
+                    });
+                    html += `</div>`;
+                    row.innerHTML = html;
+                    list.appendChild(row);
+                }
+            }
+        });
+        if (!foundAny) list.innerHTML = '<span class="empty-msg">No finishes found for selected players on this day.</span>';
+    }
+
+    async function openClip(mapId) {
+        const url = `https://kacky.socr.am/api/twitch/clip/${mapId}`;
+        const proxy = `https://corsproxy.io/?url=${encodeURIComponent(url)}`;
+        try {
+            const res = await fetch(proxy);
+            const text = await res.text();
+            const match = text.match(/https?:\/\/[^\s]+/);
+            if(match) window.open(match[0], '_blank');
+            else alert("No clip found.");
+        } catch(e) { window.open(url, '_blank'); }
+    }
+
+    // --- UTILS ---
+    function toggleEdit(id) {
+        const el = document.getElementById(`input-${id}`);
+        el.classList.toggle('show'); if (el.classList.contains('show')) el.focus();
+    }
+    function addCustomPlayer() {
+        const name = prompt("Name:"); if(!name) return;
+        const kid = prompt("Kacky ID (Optional):");
+        const id = Date.now();
+        const color = `hsl(${Math.floor(Math.random()*360)}, 100%, 70%)`;
+        players.push({ id, name, color, kid: kid });
+        sortPlayers(); renderAll(); saveState();
+    }
+    function deletePlayer(id) {
+        if(!confirm("Delete?")) return;
+        players = players.filter(p => p.id !== id);
+        delete playerData[id];
+        renderAll(); saveState();
+    }
+    function saveState() {
+        localStorage.setItem('kacky_pro_config', JSON.stringify(players));
+        localStorage.setItem('kacky_pro_data', JSON.stringify(playerData));
+        const toggles = players.filter(p => document.getElementById(`cb-${p.id}`)?.checked).map(p => p.id);
+        localStorage.setItem('kacky_view_toggles', JSON.stringify(toggles));
+    }
+    function startTimer() {
+        const el = document.getElementById('timer');
+        setInterval(() => {
+            const now = new Date();
+            const diff = KACKY_END_DATE - now;
+            if (diff <= 0) { el.innerText = "FINISHED"; el.style.color = "#ff4444"; return; }
+            const d = Math.floor(diff / (1000 * 60 * 60 * 24));
+            const h = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+            el.innerText = `${d}d ${h}h ${m}m`;
+        }, 1000);
+    }
+    
+    // EXPORT (Same logic as before)
+    const PRELOADED_STATE = null; 
+    function exportToHTML() {
+        const currentData = {};
+        players.forEach(p => currentData[p.id] = document.getElementById(`input-${p.id}`).value);
+        const state = { players, data: currentData, selectedDay };
+        const html = document.documentElement.outerHTML.replace('const PRELOADED_STATE = null;', `const PRELOADED_STATE = ${JSON.stringify(state)};`);
+        const blob = new Blob([html], {type:'text/html'});
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'kacky_live.html';
+        a.click();
+    }
+
+    init();
+</script>
+</body>
+</html>
