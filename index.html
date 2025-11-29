@@ -1,0 +1,720 @@
+<html lang="en"><head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kacky Reloaded 6 - Stats Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root { --bg: #111; --panel: #1e1e1e; --text: #eee; --accent: #ff0055; --border: #333; --success: #00d26a; --blue: #00d2ff; --danger: #ff4444; }
+        body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: var(--bg); color: var(--text); margin: 0; padding: 0; display: flex; height: 100vh; overflow: hidden; }
+        
+        /* Sidebar */
+        .sidebar { width: 340px; background: var(--panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 10px; overflow-y: auto; flex-shrink: 0; }
+        .sidebar-header { margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--border); text-align: center; }
+        .sidebar-header h2 { margin: 0; color: var(--accent); font-size: 1.2rem; }
+        
+        .btn-action { width: 100%; padding: 10px; cursor: pointer; font-size: 0.85rem; margin-bottom: 10px; transition: 0.2s; border-radius: 4px; font-weight: bold; border: 1px solid transparent; }
+        .btn-example { background: #333; color: #fff; border-color: #555; }
+        .btn-example:hover { background: #444; }
+        
+        .btn-save { background: var(--success); color: #000; }
+        .btn-save:hover { background: #00ff80; box-shadow: 0 0 10px var(--success); }
+
+        .btn-add { background: var(--blue); color: #000; }
+        .btn-add:hover { background: #4de1ff; box-shadow: 0 0 10px var(--blue); }
+
+        .instructions { font-size: 0.8rem; color: #aaa; margin-bottom: 15px; background: #252525; padding: 10px; border-radius: 4px; border-left: 3px solid var(--accent); }
+
+        /* Player Inputs */
+        .player-group { margin-bottom: 10px; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; background: #181818; transition: 0.3s; }
+        .player-header { padding: 10px; background: #2a2a2a; display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none; }
+        .player-header:hover { background: #333; }
+        .player-name { font-weight: bold; font-size: 0.9rem; }
+        .player-info-right { display: flex; align-items: center; gap: 10px; }
+        .player-stats { font-size: 0.75rem; color: #888; }
+        
+        .btn-delete { background: transparent; border: none; color: #666; font-size: 1.2rem; cursor: pointer; padding: 0 5px; line-height: 1; transition: 0.2s; }
+        .btn-delete:hover { color: var(--danger); }
+
+        textarea { width: 100%; height: 60px; border: none; background: #111; color: #ccc; padding: 8px; font-size: 0.75rem; resize: vertical; display: block; box-sizing: border-box; border-top: 1px solid var(--border); }
+        textarea:focus { outline: none; background: #000; color: #fff; }
+        
+        /* Main Content */
+        .main { flex: 1; display: flex; flex-direction: column; padding: 20px; gap: 20px; overflow-y: auto; }
+        .chart-container { background: var(--panel); border-radius: 8px; padding: 15px; height: 500px; border: 1px solid var(--border); position: relative; }
+        
+        /* Controls */
+        .controls { display: flex; flex-wrap: wrap; gap: 10px; background: var(--panel); padding: 10px; border-radius: 8px; border: 1px solid var(--border); align-items: center; }
+        .control-label { font-size: 0.9rem; color: #aaa; margin-right: 10px; }
+        .checkbox-group { display: flex; gap: 15px; flex-wrap: wrap; }
+        .cb-item { display: flex; align-items: center; gap: 5px; font-size: 0.9rem; cursor: pointer; opacity: 0.3; transition: opacity 0.2s ease; user-select: none; }
+        .cb-item:hover { opacity: 0.6; }
+        .cb-item.active { opacity: 1; font-weight: bold; text-shadow: 0 0 8px rgba(255,255,255,0.2); }
+        .cb-color { width: 10px; height: 10px; border-radius: 50%; }
+
+        /* Details Panel */
+        .details-panel { background: var(--panel); border-radius: 8px; padding: 20px; border: 1px solid var(--border); flex: 1; min-height: 200px; }
+        .details-header { font-size: 1.1rem; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid var(--border); color: #fff; }
+        .map-list { display: flex; flex-wrap: wrap; gap: 8px; }
+        
+        /* Map Tags (Buttons) */
+        .map-tag { 
+            background: #2b2b2b; 
+            color: #ddd; 
+            padding: 4px 10px; 
+            border-radius: 4px; 
+            font-size: 0.85rem; 
+            border: 1px solid #444; 
+            display: flex; 
+            align-items: center; 
+            gap: 5px; 
+            cursor: pointer;
+            transition: 0.2s;
+            user-select: none;
+        }
+        .map-tag:hover {
+            background: var(--accent);
+            color: #fff;
+            border-color: var(--accent);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+        .map-tag.loading { opacity: 0.6; cursor: wait; }
+
+        .empty-msg { color: #666; font-style: italic; }
+
+        /* VIEW ONLY MODE */
+        body.view-only textarea { display: none !important; }
+        body.view-only .btn-action { display: none !important; }
+        body.view-only .btn-delete { display: none !important; }
+        body.view-only .instructions { display: none !important; }
+        body.view-only .player-header { cursor: default; background: #1e1e1e; border-bottom: 1px solid #333; }
+        body.view-only .player-group { border: none; background: transparent; margin-bottom: 5px; }
+    </style>
+</head>
+<body>
+
+<div class="sidebar">
+    <div class="sidebar-header">
+        <h2>Kacky Analyzer</h2>
+    </div>
+    
+    <div id="actionButtons">
+        <button class="btn-action btn-add" onclick="addCustomPlayer()">+ Add Player</button>
+        <button class="btn-action btn-save" onclick="exportToHTML()">💾 Save Standalone HTML</button>
+        <button class="btn-action btn-example" onclick="loadExample()">Load SSanoTM Example</button>
+    </div>
+
+    <div class="instructions">
+        <strong>Setup:</strong><br>
+        1. Add players or use defaults.<br>
+        2. Copy text from Kacky.gg profiles.<br>
+        3. Paste into boxes below.<br>
+        4. Click "Save Standalone" to share.
+    </div>
+
+    <div id="inputsContainer"><div class="player-group">
+            <div class="player-header">
+                <span class="player-name" style="color:#FF0055">SSanoTM</span>
+                <div class="player-info-right">
+                    <span class="player-stats" id="stats-0">73 finishes</span>
+                    <button class="btn-delete" onclick="deletePlayer(0)" title="Remove Player">×</button>
+                </div>
+            </div>
+            <textarea id="txt-0" placeholder="Paste profile text here..." oninput="processInput(0, true)"></textarea>
+        </div><div class="player-group">
+            <div class="player-header">
+                <span class="player-name" style="color:#00CCFF">LinkMaxTm</span>
+                <div class="player-info-right">
+                    <span class="player-stats" id="stats-1">73 finishes</span>
+                    <button class="btn-delete" onclick="deletePlayer(1)" title="Remove Player">×</button>
+                </div>
+            </div>
+            <textarea id="txt-1" placeholder="Paste profile text here..." oninput="processInput(1, true)"></textarea>
+        </div><div class="player-group">
+            <div class="player-header">
+                <span class="player-name" style="color:#00FF99">iiHugo</span>
+                <div class="player-info-right">
+                    <span class="player-stats" id="stats-2">72 finishes</span>
+                    <button class="btn-delete" onclick="deletePlayer(2)" title="Remove Player">×</button>
+                </div>
+            </div>
+            <textarea id="txt-2" placeholder="Paste profile text here..." oninput="processInput(2, true)"></textarea>
+        </div><div class="player-group">
+            <div class="player-header">
+                <span class="player-name" style="color:#FFFF00">Samifying</span>
+                <div class="player-info-right">
+                    <span class="player-stats" id="stats-3">71 finishes</span>
+                    <button class="btn-delete" onclick="deletePlayer(3)" title="Remove Player">×</button>
+                </div>
+            </div>
+            <textarea id="txt-3" placeholder="Paste profile text here..." oninput="processInput(3, true)"></textarea>
+        </div><div class="player-group">
+            <div class="player-header">
+                <span class="player-name" style="color:#FF9900">SileenzZ_</span>
+                <div class="player-info-right">
+                    <span class="player-stats" id="stats-4">69 finishes</span>
+                    <button class="btn-delete" onclick="deletePlayer(4)" title="Remove Player">×</button>
+                </div>
+            </div>
+            <textarea id="txt-4" placeholder="Paste profile text here..." oninput="processInput(4, true)"></textarea>
+        </div><div class="player-group">
+            <div class="player-header">
+                <span class="player-name" style="color:#CC00FF">Tekky..</span>
+                <div class="player-info-right">
+                    <span class="player-stats" id="stats-5">70 finishes</span>
+                    <button class="btn-delete" onclick="deletePlayer(5)" title="Remove Player">×</button>
+                </div>
+            </div>
+            <textarea id="txt-5" placeholder="Paste profile text here..." oninput="processInput(5, true)"></textarea>
+        </div><div class="player-group">
+            <div class="player-header">
+                <span class="player-name" style="color:#FF00CC">nonickiNg</span>
+                <div class="player-info-right">
+                    <span class="player-stats" id="stats-6">69 finishes</span>
+                    <button class="btn-delete" onclick="deletePlayer(6)" title="Remove Player">×</button>
+                </div>
+            </div>
+            <textarea id="txt-6" placeholder="Paste profile text here..." oninput="processInput(6, true)"></textarea>
+        </div><div class="player-group">
+            <div class="player-header">
+                <span class="player-name" style="color:#00FF00">zetos.</span>
+                <div class="player-info-right">
+                    <span class="player-stats" id="stats-7">69 finishes</span>
+                    <button class="btn-delete" onclick="deletePlayer(7)" title="Remove Player">×</button>
+                </div>
+            </div>
+            <textarea id="txt-7" placeholder="Paste profile text here..." oninput="processInput(7, true)"></textarea>
+        </div><div class="player-group">
+            <div class="player-header">
+                <span class="player-name" style="color:#FFFFFF">mikmos.</span>
+                <div class="player-info-right">
+                    <span class="player-stats" id="stats-8">70 finishes</span>
+                    <button class="btn-delete" onclick="deletePlayer(8)" title="Remove Player">×</button>
+                </div>
+            </div>
+            <textarea id="txt-8" placeholder="Paste profile text here..." oninput="processInput(8, true)"></textarea>
+        </div><div class="player-group">
+            <div class="player-header">
+                <span class="player-name" style="color:#8888FF">shieldbandit</span>
+                <div class="player-info-right">
+                    <span class="player-stats" id="stats-9">68 finishes</span>
+                    <button class="btn-delete" onclick="deletePlayer(9)" title="Remove Player">×</button>
+                </div>
+            </div>
+            <textarea id="txt-9" placeholder="Paste profile text here..." oninput="processInput(9, true)"></textarea>
+        </div><div class="player-group">
+            <div class="player-header">
+                <span class="player-name" style="color:hsl(50, 100%, 70%)">Wingoat</span>
+                <div class="player-info-right">
+                    <span class="player-stats" id="stats-10">68 finishes</span>
+                    <button class="btn-delete" onclick="deletePlayer(10)" title="Remove Player">×</button>
+                </div>
+            </div>
+            <textarea id="txt-10" placeholder="Paste profile text here..." oninput="processInput(10, true)"></textarea>
+        </div><div class="player-group">
+            <div class="player-header">
+                <span class="player-name" style="color:hsl(300, 100%, 70%)">Jxliano</span>
+                <div class="player-info-right">
+                    <span class="player-stats" id="stats-11">67 finishes</span>
+                    <button class="btn-delete" onclick="deletePlayer(11)" title="Remove Player">×</button>
+                </div>
+            </div>
+            <textarea id="txt-11" placeholder="Paste profile text here..." oninput="processInput(11, true)"></textarea>
+        </div></div>
+</div>
+
+<div class="main">
+    <div class="controls">
+        <span class="control-label">Compare:</span>
+        <div class="checkbox-group" id="checkboxContainer"><label class="cb-item active" id="cb-label-0">
+            <div class="cb-color" style="background:#FF0055"></div>
+            <input type="checkbox" id="cb-0" onchange="updateToggle(0)" style="display:none">
+            SSanoTM
+        </label><label class="cb-item active" id="cb-label-1">
+            <div class="cb-color" style="background:#00CCFF"></div>
+            <input type="checkbox" id="cb-1" onchange="updateToggle(1)" style="display:none">
+            LinkMaxTm
+        </label><label class="cb-item active" id="cb-label-2">
+            <div class="cb-color" style="background:#00FF99"></div>
+            <input type="checkbox" id="cb-2" onchange="updateToggle(2)" style="display:none">
+            iiHugo
+        </label><label class="cb-item active" id="cb-label-3">
+            <div class="cb-color" style="background:#FFFF00"></div>
+            <input type="checkbox" id="cb-3" onchange="updateToggle(3)" style="display:none">
+            Samifying
+        </label><label class="cb-item active" id="cb-label-4">
+            <div class="cb-color" style="background:#FF9900"></div>
+            <input type="checkbox" id="cb-4" onchange="updateToggle(4)" style="display:none">
+            SileenzZ_
+        </label><label class="cb-item active" id="cb-label-5">
+            <div class="cb-color" style="background:#CC00FF"></div>
+            <input type="checkbox" id="cb-5" onchange="updateToggle(5)" style="display:none">
+            Tekky..
+        </label><label class="cb-item active" id="cb-label-6">
+            <div class="cb-color" style="background:#FF00CC"></div>
+            <input type="checkbox" id="cb-6" onchange="updateToggle(6)" style="display:none">
+            nonickiNg
+        </label><label class="cb-item active" id="cb-label-7">
+            <div class="cb-color" style="background:#00FF00"></div>
+            <input type="checkbox" id="cb-7" onchange="updateToggle(7)" style="display:none">
+            zetos.
+        </label><label class="cb-item active" id="cb-label-8">
+            <div class="cb-color" style="background:#FFFFFF"></div>
+            <input type="checkbox" id="cb-8" onchange="updateToggle(8)" style="display:none">
+            mikmos.
+        </label><label class="cb-item active" id="cb-label-9">
+            <div class="cb-color" style="background:#8888FF"></div>
+            <input type="checkbox" id="cb-9" onchange="updateToggle(9)" style="display:none">
+            shieldbandit
+        </label><label class="cb-item active" id="cb-label-10">
+            <div class="cb-color" style="background:hsl(50, 100%, 70%)"></div>
+            <input type="checkbox" id="cb-10" onchange="updateToggle(10)" style="display:none">
+            Wingoat
+        </label><label class="cb-item active" id="cb-label-11">
+            <div class="cb-color" style="background:hsl(300, 100%, 70%)"></div>
+            <input type="checkbox" id="cb-11" onchange="updateToggle(11)" style="display:none">
+            Jxliano
+        </label></div>
+    </div>
+
+    <div class="chart-container">
+        <canvas id="kackyChart" width="2127" height="500" style="display: block; box-sizing: border-box; height: 500px; width: 2127px;"></canvas>
+    </div>
+
+    <div class="details-panel">
+        <div class="details-header" id="detailsHeader">Click a point on the graph to see details</div>
+        <div class="map-list" id="detailsList"><span class="empty-msg">Select a day on the graph to view the maps finished.</span></div>
+    </div>
+</div>
+
+<script>
+    // --- STATE INJECTION POINT ---
+    const PRELOADED_STATE = {"players":[{"id":0,"name":"SSanoTM","color":"#FF0055"},{"id":1,"name":"LinkMaxTm","color":"#00CCFF"},{"id":2,"name":"iiHugo","color":"#00FF99"},{"id":3,"name":"Samifying","color":"#FFFF00"},{"id":4,"name":"SileenzZ_","color":"#FF9900"},{"id":5,"name":"Tekky..","color":"#CC00FF"},{"id":6,"name":"nonickiNg","color":"#FF00CC"},{"id":7,"name":"zetos.","color":"#00FF00"},{"id":8,"name":"mikmos.","color":"#FFFFFF"},{"id":9,"name":"shieldbandit","color":"#8888FF"},{"id":10,"name":"Wingoat","color":"hsl(50, 100%, 70%)"},{"id":11,"name":"Jxliano","color":"hsl(300, 100%, 70%)"}],"data":{"0":"Kacky Records Logo\nToggle theme\nUser Avatar\nHome\nSchedule\nHunting\nLeaderboard\nTop3\nMaps\nPlayers\nSSanoTM\nPlayer ID: 29565\nPlayer Information\nBasic player data and event statistics\nPlayer Details\nPlayer ID\n29565\nZone\nBelgium, Antwerpen\nTotal Events Played\n8\nTotal Finishes\n262\nTotal Playtime\n1823h\nEvent Statistics\nAverage Rank\n28055.09\nPlaytime\n1823h\nCompleted Maps\n73\nPersonal Records & Missing Maps\nShowing latest finish first\nSelect an event to view map breakdown:\n\nKacky Reloaded 6 (KR)\n\n#\n\nRank\n\nPB\n\nFins\n\nTotal Fins\n\nFinished\n\nImproved\n426\t2\t0:28.322\t1\t2\t29 Nov 2025\t—\n384\t2\t0:21.013\t1\t2\t26 Nov 2025\t—\n433\t21\t0:29.957\t1\t35\t25 Nov 2025\t—\n396\t5\t0:26.727\t1\t6\t22 Nov 2025\t—\n444\t4\t0:18.338\t1\t12\t21 Nov 2025\t—\n439\t11\t0:38.460\t1\t13\t21 Nov 2025\t—\n448\t2\t0:19.039\t1\t16\t20 Nov 2025\t—\n418\t2\t0:26.975\t1\t12\t19 Nov 2025\t—\n391\t4\t0:19.362\t1\t8\t18 Nov 2025\t—\n411\t4\t0:29.466\t1\t11\t17 Nov 2025\t—\n399\t14\t0:16.988\t1\t23\t17 Nov 2025\t—\n414\t12\t0:28.209\t1\t16\t16 Nov 2025\t—\n385\t11\t0:23.718\t1\t23\t15 Nov 2025\t—\n421\t34\t1:14.435\t1\t36\t15 Nov 2025\t—\n382\t31\t0:23.707\t1\t34\t14 Nov 2025\t—\n381\t2\t0:24.777\t1\t21\t14 Nov 2025\t—\n405\t44\t0:16.229\t1\t50\t13 Nov 2025\t—\n388\t14\t0:36.161\t1\t25\t13 Nov 2025\t—\n392\t54\t0:22.611\t1\t58\t12 Nov 2025\t—\n395\t12\t0:20.219\t1\t29\t12 Nov 2025\t—\n445\t39\t0:24.345\t1\t39\t12 Nov 2025\t—\n436\t35\t0:25.835\t1\t73\t12 Nov 2025\t—\n449\t41\t0:16.207\t1\t49\t11 Nov 2025\t—\n408\t23\t0:21.268\t1\t36\t11 Nov 2025\t—\n389\t34\t0:24.839\t1\t75\t11 Nov 2025\t—\n400\t3\t0:27.988\t1\t79\t11 Nov 2025\t—\n383\t19\t0:38.422\t1\t53\t11 Nov 2025\t—\n390\t9\t0:10.285\t1\t25\t10 Nov 2025\t—\n393\t34\t0:17.582\t1\t35\t10 Nov 2025\t—\n417\t53\t0:16.704\t1\t55\t9 Nov 2025\t—\n446\t134\t0:32.873\t1\t197\t9 Nov 2025\t—\n419\t18\t0:26.749\t1\t40\t9 Nov 2025\t—\n413\t20\t0:20.476\t1\t70\t9 Nov 2025\t—\n412\t74\t0:46.022\t1\t98\t9 Nov 2025\t—\n403\t42\t0:34.458\t1\t67\t8 Nov 2025\t—\n425\t12\t0:18.609\t1\t73\t8 Nov 2025\t—\n386\t3\t0:17.798\t2\t136\t8 Nov 2025\t26 Nov 2025\n430\t9\t0:20.744\t1\t43\t8 Nov 2025\t—\n435\t4\t0:17.520\t1\t79\t8 Nov 2025\t—\n401\t38\t0:15.363\t1\t42\t7 Nov 2025\t—\n422\t50\t0:22.712\t1\t142\t7 Nov 2025\t—\n424\t20\t0:30.711\t2\t93\t7 Nov 2025\t28 Nov 2025\n407\t22\t1:02.349\t1\t64\t7 Nov 2025\t—\n420\t67\t0:26.901\t1\t180\t6 Nov 2025\t—\n410\t20\t0:16.000\t5\t234\t6 Nov 2025\t29 Nov 2025\n409\t67\t0:15.727\t1\t74\t6 Nov 2025\t—\n428\t16\t0:12.614\t1\t42\t6 Nov 2025\t—\n378\t86\t0:25.721\t1\t284\t6 Nov 2025\t—\n416\t50\t0:15.090\t1\t83\t6 Nov 2025\t—\n427\t3\t0:19.406\t1\t81\t6 Nov 2025\t—\n415\t24\t0:14.822\t2\t97\t6 Nov 2025\t29 Nov 2025\n402\t135\t0:23.383\t1\t163\t5 Nov 2025\t—\n442\t114\t0:15.975\t1\t141\t5 Nov 2025\t—\n429\t28\t0:09.326\t2\t204\t5 Nov 2025\t29 Nov 2025\n438\t3\t0:11.062\t1\t423\t5 Nov 2025\t—\n380\t50\t0:19.097\t2\t1 316\t5 Nov 2025\t21 Nov 2025\n394\t25\t0:12.828\t1\t208\t4 Nov 2025\t—\n432\t136\t0:28.158\t1\t143\t4 Nov 2025\t—\n387\t56\t0:34.094\t3\t745\t4 Nov 2025\t27 Nov 2025\n441\t56\t0:22.245\t6\t272\t4 Nov 2025\t26 Nov 2025\n404\t22\t0:28.102\t2\t823\t4 Nov 2025\t26 Nov 2025\n437\t45\t0:20.800\t2\t272\t4 Nov 2025\t29 Nov 2025\n397\t123\t0:33.891\t1\t196\t4 Nov 2025\t—\n377\t31\t0:25.309\t2\t655\t4 Nov 2025\t27 Nov 2025\n440\t1\t0:11.254\t4\t314\t4 Nov 2025\t25 Nov 2025\n379\t76\t0:51.812\t3\t208\t4 Nov 2025\t28 Nov 2025\n450\t17\t1:24.514\t1\t338\t4 Nov 2025\t—\n447\t7\t0:21.876\t1\t354\t3 Nov 2025\t—\n443\t33\t0:15.929\t2\t596\t3 Nov 2025\t25 Nov 2025\n376\t53\t0:25.672\t1\t775\t3 Nov 2025\t—\n406\t18\t0:18.254\t3\t441\t3 Nov 2025\t24 Nov 2025\n434\t181\t0:21.432\t1\t476\t3 Nov 2025\t—\n423\t3\t0:20.714\t25\t653\t3 Nov 2025\t25 Nov 2025\n398\t—\t—\t—\t10\t—\t—\n431\t—\t—\t—\t1\t—\t—\nIf you like this project, consider Ko-fi icon donating,\n\nor if you have coding skills  join the dev crew!\n\nKacky.gg","1":"Kacky Records Logo\nToggle theme\nUser Avatar\nHome\nSchedule\nHunting\nLeaderboard\nTop3\nMaps\nPlayers\nLinkMaxTm\nPlayer ID: 814\nPlayer Information\nBasic player data and event statistics\nPlayer Details\nPlayer ID\n814\nZone\nAustralia, New South Wales\nTotal Events Played\n7\nTotal Finishes\n212\nTotal Playtime\n1068h\nEvent Statistics\nAverage Rank\n22396.89\nPlaytime\n1068h\nCompleted Maps\n73\nPersonal Records & Missing Maps\nShowing latest finish first\nSelect an event to view map breakdown:\n\nKacky Reloaded 6 (KR)\n\n#\n\nRank\n\nPB\n\nFins\n\nTotal Fins\n\nFinished\n\nImproved\n384\t1\t0:20.918\t1\t2\t29 Nov 2025\t—\n396\t2\t0:24.310\t1\t6\t28 Nov 2025\t—\n391\t2\t0:18.844\t1\t8\t26 Nov 2025\t—\n411\t6\t0:29.997\t1\t11\t25 Nov 2025\t—\n448\t12\t0:19.700\t1\t16\t24 Nov 2025\t—\n449\t33\t0:14.069\t1\t49\t24 Nov 2025\t—\n418\t6\t0:27.208\t1\t12\t24 Nov 2025\t—\n433\t16\t0:21.320\t1\t35\t23 Nov 2025\t—\n444\t7\t0:18.491\t1\t12\t22 Nov 2025\t—\n439\t2\t0:24.250\t2\t13\t22 Nov 2025\t—\n399\t15\t0:17.000\t1\t23\t21 Nov 2025\t—\n382\t28\t0:23.446\t1\t34\t21 Nov 2025\t—\n381\t8\t0:26.764\t1\t21\t20 Nov 2025\t—\n421\t4\t0:28.600\t1\t36\t19 Nov 2025\t—\n414\t1\t0:27.359\t2\t16\t19 Nov 2025\t—\n388\t1\t0:30.230\t2\t25\t19 Nov 2025\t19 Nov 2025\n445\t9\t0:23.581\t1\t39\t19 Nov 2025\t—\n385\t5\t0:23.565\t1\t23\t19 Nov 2025\t—\n416\t60\t0:15.252\t1\t83\t18 Nov 2025\t—\n408\t11\t0:20.845\t1\t36\t17 Nov 2025\t—\n398\t4\t0:22.054\t1\t10\t17 Nov 2025\t—\n427\t7\t0:19.773\t1\t81\t16 Nov 2025\t—\n393\t3\t0:16.064\t1\t35\t16 Nov 2025\t—\n395\t4\t0:19.712\t1\t29\t16 Nov 2025\t—\n390\t17\t0:11.642\t1\t25\t16 Nov 2025\t—\n400\t23\t0:28.798\t1\t79\t14 Nov 2025\t—\n407\t13\t0:56.642\t1\t64\t13 Nov 2025\t—\n425\t64\t0:18.955\t1\t73\t12 Nov 2025\t—\n428\t9\t0:12.433\t1\t42\t12 Nov 2025\t—\n430\t26\t0:21.145\t1\t43\t11 Nov 2025\t—\n401\t4\t0:14.420\t1\t42\t11 Nov 2025\t—\n392\t35\t0:21.220\t1\t58\t11 Nov 2025\t—\n422\t25\t0:22.358\t4\t142\t11 Nov 2025\t29 Nov 2025\n412\t3\t0:24.983\t1\t98\t11 Nov 2025\t—\n402\t15\t0:18.528\t1\t163\t10 Nov 2025\t—\n413\t5\t0:20.306\t1\t70\t9 Nov 2025\t—\n409\t66\t0:15.706\t1\t74\t9 Nov 2025\t—\n436\t18\t0:25.578\t1\t73\t8 Nov 2025\t—\n417\t37\t0:16.224\t1\t55\t8 Nov 2025\t—\n419\t5\t0:26.382\t2\t40\t8 Nov 2025\t8 Nov 2025\n442\t19\t0:15.418\t3\t141\t8 Nov 2025\t8 Nov 2025\n386\t15\t0:18.101\t1\t136\t8 Nov 2025\t—\n389\t1\t0:20.749\t2\t75\t8 Nov 2025\t13 Nov 2025\n394\t17\t0:12.734\t2\t208\t8 Nov 2025\t9 Nov 2025\n446\t36\t0:30.459\t1\t197\t7 Nov 2025\t—\n432\t106\t0:25.726\t1\t143\t7 Nov 2025\t—\n403\t14\t0:33.789\t2\t67\t7 Nov 2025\t14 Nov 2025\n437\t21\t0:20.475\t1\t272\t6 Nov 2025\t—\n420\t60\t0:26.733\t1\t180\t6 Nov 2025\t—\n424\t71\t0:31.959\t1\t93\t6 Nov 2025\t—\n397\t53\t0:28.390\t1\t196\t6 Nov 2025\t—\n410\t64\t0:17.255\t3\t234\t6 Nov 2025\t29 Nov 2025\n404\t26\t0:28.231\t1\t823\t6 Nov 2025\t—\n447\t120\t0:22.680\t1\t354\t6 Nov 2025\t—\n415\t7\t0:14.600\t3\t97\t6 Nov 2025\t—\n387\t137\t0:34.947\t1\t745\t5 Nov 2025\t—\n429\t42\t0:09.351\t3\t204\t5 Nov 2025\t9 Nov 2025\n450\t8\t1:21.940\t1\t338\t5 Nov 2025\t—\n378\t4\t0:25.059\t1\t284\t5 Nov 2025\t—\n377\t28\t0:25.274\t5\t655\t5 Nov 2025\t28 Nov 2025\n438\t15\t0:11.278\t2\t423\t5 Nov 2025\t29 Nov 2025\n380\t96\t0:19.919\t6\t1 316\t5 Nov 2025\t29 Nov 2025\n376\t59\t0:25.678\t3\t775\t5 Nov 2025\t29 Nov 2025\n441\t72\t0:22.300\t1\t272\t4 Nov 2025\t—\n379\t77\t0:51.853\t1\t208\t4 Nov 2025\t—\n440\t32\t0:11.510\t4\t314\t4 Nov 2025\t29 Nov 2025\n383\t1\t0:34.140\t5\t53\t4 Nov 2025\t6 Nov 2025\n405\t37\t0:14.728\t2\t50\t4 Nov 2025\t—\n435\t28\t0:18.340\t1\t79\t4 Nov 2025\t—\n434\t8\t0:19.974\t2\t476\t4 Nov 2025\t—\n423\t82\t0:21.189\t1\t653\t3 Nov 2025\t—\n406\t142\t0:18.909\t5\t441\t3 Nov 2025\t26 Nov 2025\n443\t1\t0:15.374\t4\t596\t3 Nov 2025\t29 Nov 2025\n426\t—\t—\t—\t2\t—\t—\n431\t—\t—\t—\t1\t—\t—\nIf you like this project, consider Ko-fi icon donating,\n\nor if you have coding skills  join the dev crew!\n\nKacky.gg","2":"Kacky Records Logo\nToggle theme\nUser Avatar\nHome\nSchedule\nHunting\nLeaderboard\nTop3\nMaps\nPlayers\niiHugo\nPlayer ID: 25376\nPlayer Information\nBasic player data and event statistics\nPlayer Details\nPlayer ID\n25376\nZone\nEurope, Sweden\nTotal Events Played\n7\nTotal Finishes\n271\nTotal Playtime\n1705h\nEvent Statistics\nAverage Rank\n25663.75\nPlaytime\n1705h\nCompleted Maps\n72\nPersonal Records & Missing Maps\nShowing latest finish first\nSelect an event to view map breakdown:\n\nKacky Reloaded 6 (KR)\n\n#\n\nRank\n\nPB\n\nFins\n\nTotal Fins\n\nFinished\n\nImproved\n396\t4\t0:26.228\t1\t6\t28 Nov 2025\t—\n391\t7\t0:20.835\t1\t8\t27 Nov 2025\t—\n444\t3\t0:18.106\t1\t12\t25 Nov 2025\t—\n448\t5\t0:19.294\t1\t16\t25 Nov 2025\t—\n439\t6\t0:24.645\t1\t13\t24 Nov 2025\t—\n411\t3\t0:29.199\t1\t11\t24 Nov 2025\t—\n398\t9\t0:52.646\t1\t10\t23 Nov 2025\t—\n449\t30\t0:13.499\t1\t49\t22 Nov 2025\t—\n414\t6\t0:27.879\t1\t16\t22 Nov 2025\t—\n388\t12\t0:35.873\t1\t25\t20 Nov 2025\t—\n418\t8\t0:27.565\t1\t12\t19 Nov 2025\t—\n399\t11\t0:16.825\t1\t23\t18 Nov 2025\t—\n421\t19\t0:41.826\t1\t36\t17 Nov 2025\t—\n382\t22\t0:23.181\t1\t34\t17 Nov 2025\t—\n433\t1\t0:12.064\t1\t35\t17 Nov 2025\t—\n445\t31\t0:24.047\t1\t39\t17 Nov 2025\t—\n390\t23\t0:12.613\t1\t25\t16 Nov 2025\t—\n385\t22\t0:24.274\t1\t23\t16 Nov 2025\t—\n381\t12\t0:27.212\t1\t21\t15 Nov 2025\t—\n408\t14\t0:20.988\t1\t36\t14 Nov 2025\t—\n430\t37\t0:21.548\t1\t43\t13 Nov 2025\t—\n392\t50\t0:22.505\t1\t58\t13 Nov 2025\t—\n409\t37\t0:14.214\t1\t74\t13 Nov 2025\t—\n395\t13\t0:20.234\t1\t29\t13 Nov 2025\t—\n428\t36\t0:13.788\t1\t42\t13 Nov 2025\t—\n413\t51\t0:20.673\t1\t70\t12 Nov 2025\t—\n393\t10\t0:16.312\t1\t35\t12 Nov 2025\t—\n407\t6\t0:50.354\t1\t64\t11 Nov 2025\t—\n400\t58\t0:30.576\t1\t79\t11 Nov 2025\t—\n425\t53\t0:18.859\t1\t73\t10 Nov 2025\t—\n389\t57\t0:28.979\t3\t75\t10 Nov 2025\t26 Nov 2025\n401\t24\t0:15.019\t1\t42\t10 Nov 2025\t—\n427\t4\t0:19.516\t1\t81\t10 Nov 2025\t—\n416\t29\t0:14.864\t1\t83\t9 Nov 2025\t—\n402\t149\t0:24.451\t1\t163\t8 Nov 2025\t—\n386\t12\t0:18.056\t13\t136\t8 Nov 2025\t28 Nov 2025\n419\t27\t0:26.966\t1\t40\t8 Nov 2025\t—\n417\t10\t0:15.859\t1\t55\t8 Nov 2025\t—\n436\t20\t0:25.605\t1\t73\t8 Nov 2025\t—\n405\t42\t0:15.196\t1\t50\t8 Nov 2025\t—\n422\t33\t0:22.499\t4\t142\t7 Nov 2025\t28 Nov 2025\n412\t30\t0:30.434\t2\t98\t7 Nov 2025\t26 Nov 2025\n383\t38\t0:40.841\t1\t53\t7 Nov 2025\t—\n415\t22\t0:14.801\t1\t97\t7 Nov 2025\t—\n424\t12\t0:30.505\t1\t93\t7 Nov 2025\t—\n394\t5\t0:12.594\t2\t208\t7 Nov 2025\t27 Nov 2025\n442\t4\t0:15.296\t3\t141\t7 Nov 2025\t27 Nov 2025\n435\t27\t0:18.304\t1\t79\t7 Nov 2025\t—\n403\t1\t0:33.197\t1\t67\t6 Nov 2025\t—\n378\t53\t0:25.531\t2\t284\t6 Nov 2025\t17 Nov 2025\n440\t24\t0:11.484\t6\t314\t6 Nov 2025\t28 Nov 2025\n437\t8\t0:20.126\t2\t272\t5 Nov 2025\t28 Nov 2025\n450\t18\t1:25.399\t3\t338\t5 Nov 2025\t29 Nov 2025\n432\t97\t0:25.314\t2\t143\t5 Nov 2025\t29 Nov 2025\n397\t15\t0:26.897\t1\t196\t5 Nov 2025\t—\n429\t84\t0:09.417\t3\t204\t5 Nov 2025\t27 Nov 2025\n446\t6\t0:29.722\t2\t197\t5 Nov 2025\t28 Nov 2025\n380\t68\t0:19.374\t3\t1 316\t5 Nov 2025\t14 Nov 2025\n438\t203\t0:12.252\t3\t423\t4 Nov 2025\t—\n420\t18\t0:25.370\t12\t180\t4 Nov 2025\t25 Nov 2025\n404\t99\t0:29.548\t3\t823\t4 Nov 2025\t25 Nov 2025\n441\t44\t0:22.198\t5\t272\t4 Nov 2025\t28 Nov 2025\n379\t17\t0:50.608\t2\t208\t4 Nov 2025\t16 Nov 2025\n410\t38\t0:16.503\t4\t234\t4 Nov 2025\t25 Nov 2025\n377\t25\t0:25.259\t5\t655\t4 Nov 2025\t26 Nov 2025\n447\t6\t0:21.874\t3\t354\t4 Nov 2025\t29 Nov 2025\n376\t30\t0:25.621\t5\t775\t3 Nov 2025\t28 Nov 2025\n387\t13\t0:32.714\t7\t745\t3 Nov 2025\t28 Nov 2025\n434\t6\t0:19.962\t3\t476\t3 Nov 2025\t23 Nov 2025\n406\t24\t0:18.302\t6\t441\t3 Nov 2025\t29 Nov 2025\n423\t11\t0:20.944\t2\t653\t3 Nov 2025\t24 Nov 2025\n443\t27\t0:15.869\t6\t596\t3 Nov 2025\t28 Nov 2025\n384\t—\t—\t—\t2\t—\t—\n426\t—\t—\t—\t2\t—\t—\n431\t—\t—\t—\t1\t—\t—\nIf you like this project, consider Ko-fi icon donating,\n\nor if you have coding skills  join the dev crew!\n\nKacky.gg","3":"Kacky Records Logo\nToggle theme\nUser Avatar\nHome\nSchedule\nHunting\nLeaderboard\nTop3\nMaps\nPlayers\nSamifying\nPlayer ID: 6789\nPlayer Information\nBasic player data and event statistics\nPlayer Details\nPlayer ID\n6789\nZone\nAustria, Tyrol\nTotal Events Played\n4\nTotal Finishes\n140\nTotal Playtime\n744h\nEvent Statistics\nAverage Rank\n26573.19\nPlaytime\n744h\nCompleted Maps\n71\nPersonal Records & Missing Maps\nShowing latest finish first\nSelect an event to view map breakdown:\n\nKacky Reloaded 6 (KR)\n\n#\n\nRank\n\nPB\n\nFins\n\nTotal Fins\n\nFinished\n\nImproved\n444\t11\t0:19.429\t1\t12\t28 Nov 2025\t—\n449\t32\t0:14.065\t1\t49\t27 Nov 2025\t—\n439\t7\t0:24.722\t1\t13\t26 Nov 2025\t—\n411\t5\t0:29.550\t1\t11\t26 Nov 2025\t—\n398\t2\t0:20.992\t1\t10\t25 Nov 2025\t—\n391\t3\t0:19.003\t1\t8\t25 Nov 2025\t—\n418\t7\t0:27.335\t1\t12\t22 Nov 2025\t—\n448\t4\t0:19.229\t1\t16\t22 Nov 2025\t—\n390\t14\t0:11.167\t1\t25\t21 Nov 2025\t—\n381\t15\t0:27.737\t1\t21\t21 Nov 2025\t—\n445\t11\t0:23.620\t1\t39\t20 Nov 2025\t—\n421\t6\t0:31.603\t1\t36\t20 Nov 2025\t—\n433\t32\t0:58.232\t1\t35\t20 Nov 2025\t—\n382\t4\t0:22.448\t1\t34\t18 Nov 2025\t—\n393\t7\t0:16.259\t1\t35\t17 Nov 2025\t—\n399\t23\t0:17.546\t1\t23\t17 Nov 2025\t—\n425\t42\t0:18.789\t1\t73\t16 Nov 2025\t—\n385\t13\t0:23.812\t1\t23\t16 Nov 2025\t—\n427\t22\t0:20.224\t1\t81\t14 Nov 2025\t—\n400\t19\t0:28.538\t1\t79\t14 Nov 2025\t—\n414\t10\t0:28.119\t1\t16\t14 Nov 2025\t—\n408\t2\t0:20.515\t1\t36\t13 Nov 2025\t—\n416\t73\t0:15.568\t1\t83\t13 Nov 2025\t—\n405\t40\t0:14.849\t1\t50\t12 Nov 2025\t—\n395\t11\t0:20.199\t1\t29\t11 Nov 2025\t—\n388\t25\t0:45.619\t1\t25\t11 Nov 2025\t—\n401\t10\t0:14.669\t1\t42\t11 Nov 2025\t—\n392\t7\t0:17.991\t1\t58\t11 Nov 2025\t—\n412\t16\t0:27.793\t1\t98\t11 Nov 2025\t—\n389\t71\t0:33.919\t1\t75\t11 Nov 2025\t—\n413\t29\t0:20.532\t1\t70\t10 Nov 2025\t—\n422\t71\t0:23.025\t1\t142\t9 Nov 2025\t—\n407\t15\t0:57.008\t1\t64\t9 Nov 2025\t—\n430\t24\t0:21.098\t1\t43\t9 Nov 2025\t—\n417\t49\t0:16.458\t1\t55\t9 Nov 2025\t—\n442\t87\t0:15.778\t2\t141\t8 Nov 2025\t—\n409\t27\t0:13.885\t1\t74\t8 Nov 2025\t—\n378\t131\t0:25.908\t1\t284\t8 Nov 2025\t—\n424\t90\t0:49.134\t1\t93\t8 Nov 2025\t—\n402\t134\t0:23.372\t1\t163\t8 Nov 2025\t—\n386\t126\t0:24.946\t1\t136\t8 Nov 2025\t—\n403\t37\t0:34.336\t1\t67\t8 Nov 2025\t—\n428\t32\t0:13.285\t1\t42\t7 Nov 2025\t—\n419\t37\t0:27.563\t1\t40\t7 Nov 2025\t—\n420\t105\t0:27.720\t1\t180\t6 Nov 2025\t—\n429\t23\t0:09.313\t1\t204\t6 Nov 2025\t—\n446\t92\t0:31.387\t1\t197\t6 Nov 2025\t—\n432\t110\t0:26.129\t1\t143\t6 Nov 2025\t—\n410\t193\t0:21.110\t1\t234\t6 Nov 2025\t—\n436\t23\t0:25.660\t1\t73\t6 Nov 2025\t—\n440\t174\t0:12.105\t1\t314\t5 Nov 2025\t—\n437\t119\t0:21.497\t1\t272\t5 Nov 2025\t—\n397\t91\t0:31.037\t1\t196\t5 Nov 2025\t—\n377\t50\t0:25.394\t1\t655\t5 Nov 2025\t—\n441\t113\t0:22.477\t1\t272\t5 Nov 2025\t—\n394\t53\t0:13.067\t1\t208\t5 Nov 2025\t—\n380\t130\t0:20.379\t2\t1 316\t5 Nov 2025\t28 Nov 2025\n434\t23\t0:20.339\t2\t476\t5 Nov 2025\t27 Nov 2025\n435\t9\t0:17.855\t1\t79\t4 Nov 2025\t—\n438\t316\t0:13.973\t1\t423\t4 Nov 2025\t—\n443\t135\t0:16.754\t1\t596\t4 Nov 2025\t—\n415\t80\t0:15.405\t1\t97\t4 Nov 2025\t—\n376\t131\t0:25.742\t2\t775\t4 Nov 2025\t24 Nov 2025\n404\t107\t0:29.689\t1\t823\t3 Nov 2025\t—\n387\t82\t0:34.440\t2\t745\t3 Nov 2025\t25 Nov 2025\n383\t8\t0:37.353\t3\t53\t3 Nov 2025\t3 Nov 2025\n406\t85\t0:18.678\t3\t441\t3 Nov 2025\t24 Nov 2025\n450\t186\t1:59.058\t1\t338\t3 Nov 2025\t—\n379\t107\t0:52.427\t1\t208\t3 Nov 2025\t—\n447\t150\t0:22.785\t2\t354\t3 Nov 2025\t—\n423\t96\t0:21.214\t2\t653\t3 Nov 2025\t27 Nov 2025\n384\t—\t—\t—\t2\t—\t—\n396\t—\t—\t—\t6\t—\t—\n426\t—\t—\t—\t2\t—\t—\n431\t—\t—\t—\t1\t—\t—\nIf you like this project, consider Ko-fi icon donating,\n\nor if you have coding skills  join the dev crew!\n\nKacky.gg","4":"Kacky Records Logo\nToggle theme\nUser Avatar\nHome\nSchedule\nHunting\nLeaderboard\nTop3\nMaps\nPlayers\nSileenzZ_\nPlayer ID: 23074\nPlayer Information\nBasic player data and event statistics\nPlayer Details\nPlayer ID\n23074\nZone\nSpain, Catalunya\nTotal Events Played\n10\nTotal Finishes\n459\nTotal Playtime\n3433h\nEvent Statistics\nAverage Rank\n28127.61\nPlaytime\n3433h\nCompleted Maps\n69\nPersonal Records & Missing Maps\nShowing latest finish first\nSelect an event to view map breakdown:\n\nKacky Reloaded 6 (KR)\n\n#\n\nRank\n\nPB\n\nFins\n\nTotal Fins\n\nFinished\n\nImproved\n433\t31\t0:54.859\t1\t35\t27 Nov 2025\t—\n448\t13\t0:20.009\t1\t16\t26 Nov 2025\t—\n449\t16\t0:11.968\t1\t49\t24 Nov 2025\t—\n411\t8\t0:31.728\t1\t11\t24 Nov 2025\t—\n444\t9\t0:19.052\t1\t12\t23 Nov 2025\t—\n439\t1\t0:23.698\t1\t13\t22 Nov 2025\t—\n399\t9\t0:16.756\t1\t23\t21 Nov 2025\t—\n418\t11\t0:27.912\t1\t12\t21 Nov 2025\t—\n388\t10\t0:34.973\t1\t25\t21 Nov 2025\t—\n414\t4\t0:27.804\t1\t16\t19 Nov 2025\t—\n385\t20\t0:24.198\t1\t23\t19 Nov 2025\t—\n390\t12\t0:10.798\t1\t25\t19 Nov 2025\t—\n405\t4\t0:12.587\t1\t50\t18 Nov 2025\t—\n428\t35\t0:13.601\t1\t42\t17 Nov 2025\t—\n450\t70\t1:39.765\t1\t338\t17 Nov 2025\t—\n445\t32\t0:24.154\t1\t39\t17 Nov 2025\t—\n421\t8\t0:34.866\t1\t36\t17 Nov 2025\t—\n382\t12\t0:22.833\t1\t34\t16 Nov 2025\t—\n416\t11\t0:14.574\t1\t83\t16 Nov 2025\t—\n381\t10\t0:26.944\t1\t21\t16 Nov 2025\t—\n408\t4\t0:20.688\t1\t36\t16 Nov 2025\t—\n395\t19\t0:20.351\t1\t29\t16 Nov 2025\t—\n392\t43\t0:21.991\t1\t58\t15 Nov 2025\t—\n419\t26\t0:26.954\t1\t40\t15 Nov 2025\t—\n407\t17\t0:57.074\t1\t64\t15 Nov 2025\t—\n377\t184\t0:25.729\t1\t653\t14 Nov 2025\t—\n436\t50\t0:25.962\t1\t73\t14 Nov 2025\t—\n383\t22\t0:38.769\t1\t53\t13 Nov 2025\t—\n389\t19\t0:21.679\t1\t75\t13 Nov 2025\t—\n400\t22\t0:28.793\t1\t79\t13 Nov 2025\t—\n430\t4\t0:20.577\t2\t43\t12 Nov 2025\t19 Nov 2025\n435\t33\t0:18.409\t1\t79\t12 Nov 2025\t—\n376\t391\t0:26.007\t1\t775\t11 Nov 2025\t—\n420\t71\t0:27.086\t1\t180\t11 Nov 2025\t—\n412\t61\t0:39.627\t1\t98\t10 Nov 2025\t—\n442\t96\t0:15.837\t1\t141\t10 Nov 2025\t—\n401\t14\t0:14.749\t1\t42\t10 Nov 2025\t—\n393\t12\t0:16.334\t1\t35\t10 Nov 2025\t—\n379\t170\t0:53.939\t1\t208\t10 Nov 2025\t—\n409\t48\t0:14.627\t1\t74\t9 Nov 2025\t—\n415\t67\t0:15.259\t1\t97\t9 Nov 2025\t—\n413\t23\t0:20.503\t1\t70\t9 Nov 2025\t—\n386\t47\t0:18.778\t1\t136\t9 Nov 2025\t—\n417\t23\t0:16.018\t1\t55\t9 Nov 2025\t—\n397\t92\t0:31.056\t1\t196\t8 Nov 2025\t—\n424\t11\t0:30.498\t1\t93\t8 Nov 2025\t—\n425\t14\t0:18.639\t1\t73\t8 Nov 2025\t—\n403\t30\t0:34.129\t1\t67\t8 Nov 2025\t—\n387\t39\t0:33.688\t2\t745\t8 Nov 2025\t8 Nov 2025\n446\t18\t0:30.107\t1\t197\t8 Nov 2025\t—\n422\t24\t0:22.353\t1\t142\t8 Nov 2025\t—\n410\t153\t0:19.425\t1\t234\t7 Nov 2025\t—\n402\t5\t0:17.568\t2\t163\t7 Nov 2025\t27 Nov 2025\n429\t51\t0:09.366\t1\t204\t6 Nov 2025\t—\n427\t51\t0:21.427\t2\t81\t6 Nov 2025\t—\n394\t97\t0:13.380\t1\t208\t6 Nov 2025\t—\n432\t12\t0:22.044\t1\t143\t6 Nov 2025\t—\n447\t25\t0:22.145\t1\t354\t6 Nov 2025\t—\n441\t161\t0:22.651\t1\t272\t6 Nov 2025\t—\n437\t60\t0:20.957\t1\t272\t5 Nov 2025\t—\n380\t83\t0:19.629\t6\t1 316\t5 Nov 2025\t27 Nov 2025\n378\t50\t0:25.518\t1\t284\t5 Nov 2025\t—\n438\t307\t0:13.656\t2\t423\t5 Nov 2025\t28 Nov 2025\n404\t260\t0:31.328\t2\t823\t4 Nov 2025\t27 Nov 2025\n434\t2\t0:19.573\t2\t476\t4 Nov 2025\t27 Nov 2025\n440\t12\t0:11.421\t3\t314\t4 Nov 2025\t4 Nov 2025\n406\t4\t0:18.029\t1\t441\t3 Nov 2025\t—\n423\t23\t0:21.029\t3\t653\t3 Nov 2025\t27 Nov 2025\n443\t12\t0:15.731\t1\t596\t3 Nov 2025\t—\n384\t—\t—\t—\t2\t—\t—\n391\t—\t—\t—\t8\t—\t—\n396\t—\t—\t—\t6\t—\t—\n398\t—\t—\t—\t10\t—\t—\n426\t—\t—\t—\t2\t—\t—\n431\t—\t—\t—\t1\t—\t—\nIf you like this project, consider Ko-fi icon donating,\n\nor if you have coding skills  join the dev crew!\n\nKacky.gg","5":"Kacky Records Logo\nToggle theme\nUser Avatar\nHome\nSchedule\nHunting\nLeaderboard\nTop3\nMaps\nPlayers\nTekky..\nPlayer ID: 14\nPlayer Information\nBasic player data and event statistics\nPlayer Details\nPlayer ID\n14\nZone\nEurope, Croatia\nTotal Events Played\n11\nTotal Finishes\n512\nTotal Playtime\n3126h\nEvent Statistics\nAverage Rank\n23947.29\nPlaytime\n3126h\nCompleted Maps\n70\nPersonal Records & Missing Maps\nShowing latest finish first\nSelect an event to view map breakdown:\n\nKacky Reloaded 6 (KR)\n\n#\n\nRank\n\nPB\n\nFins\n\nTotal Fins\n\nFinished\n\nImproved\n391\t5\t0:20.494\t1\t8\t28 Nov 2025\t—\n396\t6\t0:27.143\t1\t6\t27 Nov 2025\t—\n433\t30\t0:54.038\t1\t35\t25 Nov 2025\t—\n444\t8\t0:18.767\t1\t12\t23 Nov 2025\t—\n418\t4\t0:27.112\t1\t12\t23 Nov 2025\t—\n385\t14\t0:23.867\t1\t23\t23 Nov 2025\t—\n439\t8\t0:25.059\t1\t13\t22 Nov 2025\t—\n399\t12\t0:16.839\t1\t23\t21 Nov 2025\t—\n448\t7\t0:19.349\t1\t16\t21 Nov 2025\t—\n414\t5\t0:27.869\t1\t16\t20 Nov 2025\t—\n395\t21\t0:20.489\t1\t29\t20 Nov 2025\t—\n390\t4\t0:09.680\t1\t25\t19 Nov 2025\t—\n388\t20\t0:39.074\t1\t25\t19 Nov 2025\t—\n393\t17\t0:16.392\t1\t35\t18 Nov 2025\t—\n421\t28\t0:55.027\t1\t36\t16 Nov 2025\t—\n449\t7\t0:11.723\t2\t49\t16 Nov 2025\t20 Nov 2025\n409\t34\t0:14.139\t1\t74\t16 Nov 2025\t—\n427\t64\t0:22.174\t1\t81\t16 Nov 2025\t—\n392\t37\t0:21.664\t1\t58\t15 Nov 2025\t—\n428\t30\t0:13.120\t1\t42\t15 Nov 2025\t—\n436\t15\t0:25.540\t2\t73\t15 Nov 2025\t27 Nov 2025\n382\t8\t0:22.633\t1\t34\t15 Nov 2025\t—\n408\t34\t0:22.728\t1\t36\t14 Nov 2025\t—\n430\t30\t0:21.287\t1\t43\t14 Nov 2025\t—\n445\t25\t0:23.843\t1\t39\t14 Nov 2025\t—\n419\t34\t0:27.301\t1\t40\t14 Nov 2025\t—\n397\t124\t0:33.932\t1\t196\t12 Nov 2025\t—\n381\t6\t0:25.088\t1\t21\t12 Nov 2025\t—\n413\t64\t0:20.787\t1\t70\t12 Nov 2025\t—\n429\t201\t0:09.919\t1\t204\t10 Nov 2025\t—\n400\t68\t0:31.657\t1\t79\t10 Nov 2025\t—\n402\t34\t0:19.370\t6\t163\t9 Nov 2025\t27 Nov 2025\n389\t33\t0:23.369\t1\t75\t9 Nov 2025\t—\n424\t84\t0:33.068\t1\t93\t9 Nov 2025\t—\n401\t19\t0:14.870\t1\t42\t9 Nov 2025\t—\n422\t116\t0:24.384\t1\t142\t9 Nov 2025\t—\n416\t82\t0:16.290\t1\t83\t9 Nov 2025\t—\n437\t72\t0:21.078\t1\t272\t8 Nov 2025\t—\n405\t33\t0:14.397\t1\t50\t8 Nov 2025\t—\n383\t25\t0:38.798\t1\t53\t8 Nov 2025\t—\n386\t38\t0:18.561\t2\t136\t8 Nov 2025\t8 Nov 2025\n412\t48\t0:35.107\t1\t98\t8 Nov 2025\t—\n407\t19\t0:59.613\t1\t64\t7 Nov 2025\t—\n415\t92\t0:15.682\t1\t97\t7 Nov 2025\t—\n442\t33\t0:15.500\t1\t141\t7 Nov 2025\t—\n425\t41\t0:18.789\t1\t73\t6 Nov 2025\t—\n435\t24\t0:18.223\t1\t79\t6 Nov 2025\t—\n432\t63\t0:24.258\t1\t143\t6 Nov 2025\t—\n446\t39\t0:30.482\t1\t197\t6 Nov 2025\t—\n403\t35\t0:34.311\t1\t67\t6 Nov 2025\t—\n417\t44\t0:16.308\t1\t55\t6 Nov 2025\t—\n410\t6\t0:14.898\t3\t234\t6 Nov 2025\t23 Nov 2025\n379\t44\t0:51.142\t1\t208\t5 Nov 2025\t—\n404\t84\t0:29.382\t2\t823\t5 Nov 2025\t28 Nov 2025\n394\t157\t0:14.099\t2\t208\t5 Nov 2025\t28 Nov 2025\n378\t76\t0:25.664\t1\t284\t5 Nov 2025\t—\n441\t69\t0:22.292\t4\t272\t5 Nov 2025\t24 Nov 2025\n380\t36\t0:18.799\t5\t1 316\t5 Nov 2025\t28 Nov 2025\n387\t27\t0:33.302\t5\t745\t4 Nov 2025\t27 Nov 2025\n434\t446\t0:24.477\t1\t476\t4 Nov 2025\t—\n443\t30\t0:15.926\t1\t596\t4 Nov 2025\t—\n450\t82\t1:41.441\t1\t338\t4 Nov 2025\t—\n377\t27\t0:25.269\t2\t655\t4 Nov 2025\t23 Nov 2025\n447\t49\t0:22.363\t3\t354\t4 Nov 2025\t23 Nov 2025\n440\t11\t0:11.411\t7\t314\t4 Nov 2025\t28 Nov 2025\n423\t40\t0:21.108\t2\t653\t4 Nov 2025\t27 Nov 2025\n438\t250\t0:12.582\t2\t423\t4 Nov 2025\t27 Nov 2025\n376\t468\t0:26.159\t5\t775\t3 Nov 2025\t27 Nov 2025\n420\t9\t0:24.771\t2\t180\t3 Nov 2025\t6 Nov 2025\n406\t41\t0:18.444\t1\t441\t3 Nov 2025\t—\n384\t—\t—\t—\t2\t—\t—\n398\t—\t—\t—\t10\t—\t—\n411\t—\t—\t—\t11\t—\t—\n426\t—\t—\t—\t2\t—\t—\n431\t—\t—\t—\t1\t—\t—\nIf you like this project, consider Ko-fi icon donating,\n\nor if you have coding skills  join the dev crew!\n\nKacky.gg","6":"Kacky Records Logo\nToggle theme\nUser Avatar\nHome\nSchedule\nHunting\nLeaderboard\nTop3\nMaps\nPlayers\nnonickiNg\nPlayer ID: 890\nPlayer Information\nBasic player data and event statistics\nPlayer Details\nPlayer ID\n890\nZone\nGrand Est, Moselle\nTotal Events Played\n10\nTotal Finishes\n376\nTotal Playtime\n3798h\nEvent Statistics\nAverage Rank\n39088.88\nPlaytime\n3797h\nCompleted Maps\n69\nPersonal Records & Missing Maps\nShowing latest finish first\nSelect an event to view map breakdown:\n\nKacky Reloaded 6 (KR)\n\n#\n\nRank\n\nPB\n\nFins\n\nTotal Fins\n\nFinished\n\nImproved\n444\t6\t0:18.356\t1\t12\t28 Nov 2025\t—\n448\t3\t0:19.079\t1\t16\t28 Nov 2025\t—\n418\t5\t0:27.132\t1\t12\t25 Nov 2025\t—\n439\t5\t0:24.526\t1\t13\t25 Nov 2025\t—\n388\t6\t0:33.581\t1\t25\t24 Nov 2025\t—\n398\t8\t0:36.893\t1\t10\t24 Nov 2025\t—\n433\t9\t0:18.334\t1\t35\t24 Nov 2025\t—\n381\t7\t0:25.419\t1\t21\t23 Nov 2025\t—\n399\t7\t0:16.668\t1\t23\t22 Nov 2025\t—\n414\t8\t0:27.899\t1\t16\t20 Nov 2025\t—\n385\t9\t0:23.682\t1\t23\t20 Nov 2025\t—\n445\t27\t0:23.870\t1\t39\t19 Nov 2025\t—\n395\t22\t0:20.522\t1\t29\t19 Nov 2025\t—\n393\t22\t0:16.515\t1\t35\t18 Nov 2025\t—\n421\t30\t0:56.108\t1\t36\t18 Nov 2025\t—\n408\t8\t0:20.772\t1\t36\t17 Nov 2025\t—\n382\t17\t0:22.943\t1\t34\t17 Nov 2025\t—\n419\t2\t0:26.313\t1\t40\t16 Nov 2025\t—\n401\t17\t0:14.807\t1\t42\t16 Nov 2025\t—\n390\t11\t0:10.704\t1\t25\t16 Nov 2025\t—\n428\t3\t0:12.342\t1\t42\t15 Nov 2025\t—\n400\t28\t0:28.952\t1\t79\t15 Nov 2025\t—\n407\t33\t1:09.808\t1\t64\t15 Nov 2025\t—\n389\t16\t0:21.599\t5\t75\t14 Nov 2025\t17 Nov 2025\n392\t15\t0:19.537\t1\t58\t14 Nov 2025\t—\n427\t57\t0:21.692\t1\t81\t14 Nov 2025\t—\n430\t16\t0:20.976\t1\t43\t13 Nov 2025\t—\n403\t36\t0:34.322\t1\t67\t13 Nov 2025\t—\n424\t4\t0:30.298\t1\t93\t13 Nov 2025\t—\n425\t18\t0:18.650\t1\t73\t13 Nov 2025\t—\n417\t18\t0:15.944\t1\t55\t12 Nov 2025\t—\n449\t22\t0:12.203\t1\t49\t12 Nov 2025\t—\n397\t8\t0:26.469\t1\t196\t12 Nov 2025\t—\n383\t44\t0:41.525\t1\t53\t12 Nov 2025\t—\n435\t59\t0:19.790\t1\t79\t12 Nov 2025\t—\n413\t67\t0:20.840\t1\t70\t12 Nov 2025\t—\n386\t44\t0:18.651\t1\t136\t11 Nov 2025\t—\n436\t55\t0:26.004\t1\t73\t10 Nov 2025\t—\n409\t35\t0:14.209\t1\t74\t10 Nov 2025\t—\n402\t163\t7:13.759\t1\t163\t9 Nov 2025\t—\n412\t49\t0:35.437\t1\t98\t9 Nov 2025\t—\n416\t23\t0:14.826\t1\t83\t9 Nov 2025\t—\n415\t40\t0:14.968\t1\t97\t9 Nov 2025\t—\n432\t32\t0:23.268\t1\t143\t9 Nov 2025\t—\n422\t118\t0:24.522\t1\t142\t8 Nov 2025\t—\n420\t112\t0:27.900\t1\t180\t8 Nov 2025\t—\n394\t201\t0:16.879\t1\t208\t8 Nov 2025\t—\n437\t265\t0:39.637\t1\t272\t7 Nov 2025\t—\n379\t57\t0:51.451\t1\t208\t7 Nov 2025\t—\n440\t134\t0:11.862\t1\t314\t7 Nov 2025\t—\n442\t66\t0:15.659\t1\t141\t7 Nov 2025\t—\n429\t138\t0:09.501\t1\t204\t7 Nov 2025\t—\n378\t1\t0:24.705\t1\t284\t6 Nov 2025\t—\n446\t105\t0:31.745\t1\t197\t5 Nov 2025\t—\n450\t95\t1:42.392\t1\t338\t5 Nov 2025\t—\n438\t4\t0:11.088\t1\t423\t5 Nov 2025\t—\n405\t32\t0:14.313\t1\t50\t5 Nov 2025\t—\n380\t203\t0:21.263\t3\t1 316\t4 Nov 2025\t22 Nov 2025\n443\t392\t0:18.352\t1\t596\t4 Nov 2025\t—\n441\t130\t0:22.544\t1\t272\t4 Nov 2025\t—\n387\t143\t0:34.994\t1\t745\t4 Nov 2025\t—\n410\t115\t0:18.421\t1\t234\t4 Nov 2025\t—\n447\t148\t0:22.782\t1\t354\t4 Nov 2025\t—\n434\t251\t0:21.689\t1\t476\t4 Nov 2025\t—\n404\t298\t0:31.743\t1\t823\t4 Nov 2025\t—\n423\t491\t0:21.688\t1\t653\t4 Nov 2025\t—\n377\t524\t0:26.374\t1\t653\t3 Nov 2025\t—\n376\t134\t0:25.745\t1\t775\t3 Nov 2025\t—\n406\t140\t0:18.903\t1\t441\t3 Nov 2025\t—\n384\t—\t—\t—\t2\t—\t—\n391\t—\t—\t—\t8\t—\t—\n396\t—\t—\t—\t6\t—\t—\n411\t—\t—\t—\t11\t—\t—\n426\t—\t—\t—\t2\t—\t—\n431\t—\t—\t—\t1\t—\t—\nIf you like this project, consider Ko-fi icon donating,\n\nor if you have coding skills  join the dev crew!\n\nKacky.gg","7":"Kacky Records Logo\nToggle theme\nUser Avatar\nHome\nSchedule\nHunting\nLeaderboard\nTop3\nMaps\nPlayers\nzetos.\nPlayer ID: 23083\nPlayer Information\nBasic player data and event statistics\nPlayer Details\nPlayer ID\n23083\nZone\nSpain, Comunidad de Madrid\nTotal Events Played\n10\nTotal Finishes\n459\nTotal Playtime\n3058h\nEvent Statistics\nAverage Rank\n25166.49\nPlaytime\n3057h\nCompleted Maps\n69\nPersonal Records & Missing Maps\nShowing latest finish first\nSelect an event to view map breakdown:\n\nKacky Reloaded 6 (KR)\n\n#\n\nRank\n\nPB\n\nFins\n\nTotal Fins\n\nFinished\n\nImproved\n444\t2\t0:17.892\t1\t12\t29 Nov 2025\t—\n418\t12\t0:27.915\t1\t12\t27 Nov 2025\t—\n439\t13\t0:48.637\t1\t13\t26 Nov 2025\t—\n414\t15\t0:28.344\t1\t16\t25 Nov 2025\t—\n448\t8\t0:19.379\t1\t16\t25 Nov 2025\t—\n398\t7\t0:35.208\t1\t10\t24 Nov 2025\t—\n388\t3\t0:31.930\t1\t25\t24 Nov 2025\t—\n399\t1\t0:16.268\t1\t23\t22 Nov 2025\t—\n415\t56\t0:15.118\t1\t97\t21 Nov 2025\t—\n420\t78\t0:27.175\t1\t180\t20 Nov 2025\t—\n393\t1\t0:15.355\t1\t35\t20 Nov 2025\t—\n386\t68\t0:19.557\t1\t136\t20 Nov 2025\t—\n382\t32\t0:23.954\t1\t34\t20 Nov 2025\t—\n430\t12\t0:20.820\t1\t43\t20 Nov 2025\t—\n381\t18\t0:28.106\t1\t21\t19 Nov 2025\t—\n401\t7\t0:14.632\t1\t42\t19 Nov 2025\t—\n424\t9\t0:30.455\t1\t93\t19 Nov 2025\t—\n385\t19\t0:24.159\t1\t23\t19 Nov 2025\t—\n379\t80\t0:51.915\t1\t208\t19 Nov 2025\t—\n428\t26\t0:12.925\t1\t42\t19 Nov 2025\t—\n422\t6\t0:21.959\t1\t142\t18 Nov 2025\t—\n400\t5\t0:28.038\t1\t79\t17 Nov 2025\t—\n433\t23\t0:35.281\t1\t35\t17 Nov 2025\t—\n445\t38\t0:24.293\t1\t39\t16 Nov 2025\t—\n408\t10\t0:20.808\t1\t36\t15 Nov 2025\t—\n405\t47\t0:16.584\t1\t50\t15 Nov 2025\t—\n383\t46\t0:41.820\t1\t53\t15 Nov 2025\t—\n419\t16\t0:26.695\t1\t40\t15 Nov 2025\t—\n413\t13\t0:20.437\t1\t70\t15 Nov 2025\t—\n421\t14\t0:37.229\t1\t36\t14 Nov 2025\t—\n395\t24\t0:20.605\t1\t29\t14 Nov 2025\t—\n387\t391\t0:36.299\t1\t745\t14 Nov 2025\t—\n412\t66\t0:41.416\t1\t98\t13 Nov 2025\t—\n407\t51\t1:35.818\t1\t64\t13 Nov 2025\t—\n417\t16\t0:15.929\t1\t55\t13 Nov 2025\t—\n392\t30\t0:20.835\t1\t58\t12 Nov 2025\t—\n390\t10\t0:10.638\t1\t25\t12 Nov 2025\t—\n389\t6\t0:21.189\t1\t75\t9 Nov 2025\t—\n449\t28\t0:13.319\t1\t49\t9 Nov 2025\t—\n427\t39\t0:20.948\t1\t81\t9 Nov 2025\t—\n403\t24\t0:33.963\t1\t67\t9 Nov 2025\t—\n425\t28\t0:18.739\t1\t73\t8 Nov 2025\t—\n409\t31\t0:14.037\t1\t74\t8 Nov 2025\t—\n435\t57\t0:19.479\t1\t79\t7 Nov 2025\t—\n397\t86\t0:30.541\t1\t196\t7 Nov 2025\t—\n378\t79\t0:25.672\t1\t284\t7 Nov 2025\t—\n436\t33\t0:25.832\t1\t73\t6 Nov 2025\t—\n410\t81\t0:17.556\t1\t234\t6 Nov 2025\t—\n404\t696\t0:37.915\t1\t823\t6 Nov 2025\t—\n394\t62\t0:13.130\t1\t208\t5 Nov 2025\t—\n446\t118\t0:32.139\t1\t197\t5 Nov 2025\t—\n402\t79\t0:21.058\t1\t163\t5 Nov 2025\t—\n437\t101\t0:21.370\t2\t272\t5 Nov 2025\t5 Nov 2025\n450\t36\t1:32.643\t1\t338\t5 Nov 2025\t—\n416\t42\t0:15.011\t1\t83\t5 Nov 2025\t—\n429\t99\t0:09.438\t1\t204\t5 Nov 2025\t—\n380\t16\t0:18.009\t2\t1 316\t4 Nov 2025\t27 Nov 2025\n447\t28\t0:22.181\t1\t354\t4 Nov 2025\t—\n440\t272\t0:14.303\t1\t314\t4 Nov 2025\t—\n442\t129\t0:16.057\t1\t141\t4 Nov 2025\t—\n441\t11\t0:21.906\t1\t272\t4 Nov 2025\t—\n376\t396\t0:26.010\t1\t775\t4 Nov 2025\t—\n438\t123\t0:11.867\t1\t423\t3 Nov 2025\t—\n377\t83\t0:25.504\t1\t653\t3 Nov 2025\t—\n423\t412\t0:21.566\t1\t653\t3 Nov 2025\t—\n406\t335\t0:20.420\t1\t441\t3 Nov 2025\t—\n434\t98\t0:21.116\t1\t476\t3 Nov 2025\t—\n432\t24\t0:22.704\t1\t143\t3 Nov 2025\t—\n443\t53\t0:16.066\t1\t596\t3 Nov 2025\t—\n384\t—\t—\t—\t2\t—\t—\n391\t—\t—\t—\t8\t—\t—\n396\t—\t—\t—\t6\t—\t—\n411\t—\t—\t—\t11\t—\t—\n426\t—\t—\t—\t2\t—\t—\n431\t—\t—\t—\t1\t—\t—\nIf you like this project, consider Ko-fi icon donating,\n\nor if you have coding skills  join the dev crew!\n\nKacky.gg","8":"Kacky Records Logo\nToggle theme\nUser Avatar\nHome\nSchedule\nHunting\nLeaderboard\nTop3\nMaps\nPlayers\nmikmos.\nPlayer ID: 33369\nPlayer Information\nBasic player data and event statistics\nPlayer Details\nPlayer ID\n33369\nZone\nPoland, Podkarpackie\nTotal Events Played\n10\nTotal Finishes\n477\nTotal Playtime\n3517h\nEvent Statistics\nAverage Rank\n28514.24\nPlaytime\n3517h\nCompleted Maps\n70\nPersonal Records & Missing Maps\nShowing latest finish first\nSelect an event to view map breakdown:\n\nKacky Reloaded 6 (KR)\n\n#\n\nRank\n\nPB\n\nFins\n\nTotal Fins\n\nFinished\n\nImproved\n439\t3\t0:24.275\t1\t13\t29 Nov 2025\t—\n418\t1\t0:26.648\t1\t12\t27 Nov 2025\t—\n411\t11\t0:33.318\t1\t11\t27 Nov 2025\t—\n449\t1\t0:11.330\t1\t49\t26 Nov 2025\t—\n426\t1\t0:28.294\t1\t2\t25 Nov 2025\t—\n448\t6\t0:19.329\t1\t16\t24 Nov 2025\t—\n391\t1\t0:18.838\t1\t8\t23 Nov 2025\t—\n399\t2\t0:16.318\t1\t23\t22 Nov 2025\t—\n390\t21\t0:12.278\t1\t25\t20 Nov 2025\t—\n381\t17\t0:28.012\t1\t21\t18 Nov 2025\t—\n385\t16\t0:23.991\t1\t23\t17 Nov 2025\t—\n414\t9\t0:27.984\t1\t16\t16 Nov 2025\t—\n382\t24\t0:23.359\t1\t34\t16 Nov 2025\t—\n421\t13\t0:37.152\t1\t36\t15 Nov 2025\t—\n433\t2\t0:13.113\t1\t35\t15 Nov 2025\t—\n445\t34\t0:24.162\t1\t39\t15 Nov 2025\t—\n405\t7\t0:12.873\t1\t50\t15 Nov 2025\t—\n395\t14\t0:20.241\t1\t29\t14 Nov 2025\t—\n388\t17\t0:37.826\t1\t25\t14 Nov 2025\t—\n408\t26\t0:21.484\t1\t36\t13 Nov 2025\t—\n400\t15\t0:28.485\t1\t79\t13 Nov 2025\t—\n412\t76\t0:46.659\t1\t98\t13 Nov 2025\t—\n427\t37\t0:20.812\t1\t81\t13 Nov 2025\t—\n393\t21\t0:16.494\t1\t35\t12 Nov 2025\t—\n392\t32\t0:21.193\t1\t58\t12 Nov 2025\t—\n428\t41\t0:16.046\t1\t42\t12 Nov 2025\t—\n383\t20\t0:38.484\t1\t53\t12 Nov 2025\t—\n407\t8\t0:51.352\t1\t64\t12 Nov 2025\t—\n430\t20\t0:21.056\t1\t43\t12 Nov 2025\t—\n419\t36\t0:27.498\t1\t40\t11 Nov 2025\t—\n389\t49\t0:27.939\t1\t75\t10 Nov 2025\t—\n417\t39\t0:16.233\t1\t55\t10 Nov 2025\t—\n435\t10\t0:17.863\t1\t79\t10 Nov 2025\t—\n416\t33\t0:14.891\t1\t83\t9 Nov 2025\t—\n409\t45\t0:14.478\t1\t74\t9 Nov 2025\t—\n403\t20\t0:33.883\t1\t67\t8 Nov 2025\t—\n402\t53\t0:20.129\t1\t163\t8 Nov 2025\t—\n397\t70\t0:29.448\t1\t196\t8 Nov 2025\t—\n415\t91\t0:15.653\t1\t97\t8 Nov 2025\t—\n425\t19\t0:18.679\t1\t73\t8 Nov 2025\t—\n394\t81\t0:13.235\t1\t208\t7 Nov 2025\t—\n413\t49\t0:20.664\t1\t70\t7 Nov 2025\t—\n432\t117\t0:26.300\t1\t143\t7 Nov 2025\t—\n446\t149\t0:33.578\t1\t197\t7 Nov 2025\t—\n386\t36\t0:18.492\t1\t136\t6 Nov 2025\t—\n422\t114\t0:24.249\t1\t142\t5 Nov 2025\t—\n437\t116\t0:21.473\t1\t272\t5 Nov 2025\t—\n401\t2\t0:14.286\t1\t42\t5 Nov 2025\t—\n378\t42\t0:25.440\t1\t284\t5 Nov 2025\t—\n420\t90\t0:27.343\t1\t180\t5 Nov 2025\t—\n442\t41\t0:15.524\t1\t141\t5 Nov 2025\t—\n410\t192\t0:21.101\t1\t234\t5 Nov 2025\t—\n429\t18\t0:09.308\t1\t204\t5 Nov 2025\t—\n450\t51\t1:36.478\t1\t338\t4 Nov 2025\t—\n380\t1235\t0:33.968\t1\t1 316\t4 Nov 2025\t—\n404\t262\t0:31.341\t2\t823\t4 Nov 2025\t—\n438\t304\t0:13.489\t1\t423\t4 Nov 2025\t—\n441\t133\t0:22.547\t1\t272\t4 Nov 2025\t—\n436\t46\t0:25.924\t1\t73\t4 Nov 2025\t—\n376\t472\t0:26.168\t1\t775\t4 Nov 2025\t—\n447\t240\t0:23.132\t1\t354\t4 Nov 2025\t—\n379\t53\t0:51.396\t1\t208\t4 Nov 2025\t—\n434\t207\t0:21.536\t1\t476\t3 Nov 2025\t—\n377\t86\t0:25.508\t1\t655\t3 Nov 2025\t—\n424\t57\t0:31.560\t1\t93\t3 Nov 2025\t—\n406\t340\t0:20.478\t1\t441\t3 Nov 2025\t—\n440\t19\t0:11.468\t7\t314\t3 Nov 2025\t29 Nov 2025\n423\t207\t0:21.342\t2\t653\t3 Nov 2025\t—\n443\t563\t0:21.469\t1\t596\t3 Nov 2025\t—\n387\t57\t0:34.119\t4\t745\t3 Nov 2025\t29 Nov 2025\n384\t—\t—\t—\t2\t—\t—\n396\t—\t—\t—\t6\t—\t—\n398\t—\t—\t—\t10\t—\t—\n431\t—\t—\t—\t1\t—\t—\n444\t—\t—\t—\t12\t—\t—\nIf you like this project, consider Ko-fi icon donating,\n\nor if you have coding skills  join the dev crew!\n\nKacky.gg","9":"Kacky Records Logo\nToggle theme\nUser Avatar\nHome\nSchedule\nHunting\nLeaderboard\nTop3\nMaps\nPlayers\nshieldbandit\nPlayer ID: 166\nPlayer Information\nBasic player data and event statistics\nPlayer Details\nPlayer ID\n166\nZone\nUnited States, Oregon\nTotal Events Played\n8\nTotal Finishes\n363\nTotal Playtime\n3178h\nEvent Statistics\nAverage Rank\n34501.15\nPlaytime\n3178h\nCompleted Maps\n68\nPersonal Records & Missing Maps\nShowing latest finish first\nSelect an event to view map breakdown:\n\nKacky Reloaded 6 (KR)\n\n#\n\nRank\n\nPB\n\nFins\n\nTotal Fins\n\nFinished\n\nImproved\n418\t9\t0:27.622\t1\t12\t29 Nov 2025\t—\n411\t10\t0:32.957\t1\t11\t29 Nov 2025\t—\n433\t25\t0:47.686\t1\t35\t26 Nov 2025\t—\n416\t21\t0:14.796\t1\t83\t24 Nov 2025\t—\n448\t10\t0:19.594\t1\t16\t24 Nov 2025\t—\n439\t12\t0:38.659\t1\t13\t24 Nov 2025\t—\n388\t4\t0:32.728\t1\t25\t24 Nov 2025\t—\n382\t29\t0:23.478\t1\t34\t23 Nov 2025\t—\n414\t16\t0:28.584\t1\t16\t23 Nov 2025\t—\n399\t13\t0:16.964\t1\t23\t22 Nov 2025\t—\n381\t19\t0:28.338\t1\t21\t21 Nov 2025\t—\n445\t30\t0:23.947\t1\t39\t20 Nov 2025\t—\n395\t5\t0:19.781\t1\t29\t20 Nov 2025\t—\n405\t9\t0:12.923\t1\t50\t20 Nov 2025\t—\n385\t17\t0:24.094\t1\t23\t20 Nov 2025\t—\n390\t6\t0:09.813\t1\t25\t18 Nov 2025\t—\n419\t17\t0:26.726\t1\t40\t18 Nov 2025\t—\n421\t24\t0:45.998\t1\t36\t18 Nov 2025\t—\n408\t28\t0:21.662\t1\t36\t17 Nov 2025\t—\n430\t10\t0:20.759\t1\t43\t17 Nov 2025\t—\n393\t24\t0:16.597\t1\t35\t16 Nov 2025\t—\n409\t22\t0:13.655\t1\t74\t16 Nov 2025\t—\n428\t22\t0:12.832\t1\t42\t16 Nov 2025\t—\n392\t2\t0:17.207\t1\t58\t15 Nov 2025\t—\n424\t5\t0:30.345\t1\t93\t15 Nov 2025\t—\n401\t13\t0:14.735\t1\t42\t15 Nov 2025\t—\n383\t17\t0:38.104\t1\t53\t15 Nov 2025\t—\n386\t16\t0:18.103\t1\t136\t15 Nov 2025\t—\n436\t25\t0:25.675\t1\t73\t14 Nov 2025\t—\n429\t171\t0:09.556\t1\t204\t14 Nov 2025\t—\n425\t9\t0:18.599\t1\t73\t13 Nov 2025\t—\n403\t34\t0:34.254\t1\t67\t13 Nov 2025\t—\n389\t72\t0:33.979\t1\t75\t13 Nov 2025\t—\n407\t55\t1:45.734\t1\t64\t11 Nov 2025\t—\n417\t35\t0:16.203\t1\t55\t11 Nov 2025\t—\n422\t65\t0:22.984\t1\t142\t10 Nov 2025\t—\n400\t18\t0:28.517\t1\t79\t10 Nov 2025\t—\n427\t12\t0:19.836\t1\t81\t10 Nov 2025\t—\n413\t31\t0:20.538\t1\t70\t9 Nov 2025\t—\n394\t143\t0:13.848\t1\t208\t9 Nov 2025\t—\n420\t26\t0:25.663\t1\t180\t9 Nov 2025\t—\n415\t18\t0:14.751\t1\t97\t8 Nov 2025\t—\n450\t107\t1:44.106\t1\t338\t8 Nov 2025\t—\n379\t164\t0:53.810\t1\t208\t8 Nov 2025\t—\n432\t109\t0:26.121\t1\t143\t8 Nov 2025\t—\n412\t75\t0:46.295\t1\t98\t8 Nov 2025\t—\n438\t348\t0:15.106\t1\t423\t8 Nov 2025\t—\n378\t117\t0:25.855\t1\t284\t7 Nov 2025\t—\n397\t192\t1:33.912\t1\t196\t7 Nov 2025\t—\n446\t50\t0:30.719\t1\t197\t7 Nov 2025\t—\n440\t18\t0:11.464\t1\t314\t7 Nov 2025\t—\n449\t9\t0:11.778\t1\t49\t7 Nov 2025\t—\n447\t271\t0:23.280\t1\t354\t6 Nov 2025\t—\n410\t202\t0:21.784\t1\t234\t6 Nov 2025\t—\n402\t28\t0:19.157\t1\t163\t6 Nov 2025\t—\n406\t89\t0:18.685\t1\t441\t6 Nov 2025\t—\n387\t17\t0:32.918\t12\t745\t6 Nov 2025\t27 Nov 2025\n435\t30\t0:18.348\t1\t79\t5 Nov 2025\t—\n442\t34\t0:15.502\t1\t141\t5 Nov 2025\t—\n437\t90\t0:21.255\t1\t272\t5 Nov 2025\t—\n380\t254\t0:21.764\t2\t1 316\t5 Nov 2025\t—\n443\t261\t0:17.439\t1\t596\t5 Nov 2025\t—\n441\t207\t0:22.879\t1\t272\t5 Nov 2025\t—\n376\t267\t0:25.849\t1\t775\t5 Nov 2025\t—\n404\t180\t0:30.422\t4\t823\t5 Nov 2025\t29 Nov 2025\n423\t21\t0:21.019\t1\t653\t4 Nov 2025\t—\n377\t241\t0:25.823\t2\t655\t4 Nov 2025\t29 Nov 2025\n434\t255\t0:21.698\t1\t476\t4 Nov 2025\t—\n384\t—\t—\t—\t2\t—\t—\n391\t—\t—\t—\t8\t—\t—\n396\t—\t—\t—\t6\t—\t—\n398\t—\t—\t—\t10\t—\t—\n426\t—\t—\t—\t2\t—\t—\n431\t—\t—\t—\t1\t—\t—\n444\t—\t—\t—\t12\t—\t—\nIf you like this project, consider Ko-fi icon donating,\n\nor if you have coding skills  join the dev crew!\n\nKacky.gg","10":"Kacky Records Logo\nToggle theme\nUser Avatar\nHome\nSchedule\nHunting\nLeaderboard\nTop3\nMaps\nPlayers\nWingoat_\nPlayer ID: 1325\nPlayer Information\nBasic player data and event statistics\nPlayer Details\nPlayer ID\n1325\nZone\nÎle-de-France, Yvelines\nTotal Events Played\n6\nTotal Finishes\n294\nTotal Playtime\n1997h\nEvent Statistics\nAverage Rank\n28970.47\nPlaytime\n1997h\nCompleted Maps\n68\nPersonal Records & Missing Maps\nShowing latest finish first\nSelect an event to view map breakdown:\n\nKacky Reloaded 6 (KR)\n\n#\n\nRank\n\nPB\n\nFins\n\nTotal Fins\n\nFinished\n\nImproved\n448\t9\t0:19.458\t1\t16\t28 Nov 2025\t—\n444\t12\t0:19.622\t1\t12\t28 Nov 2025\t—\n439\t9\t0:25.248\t1\t13\t26 Nov 2025\t—\n414\t7\t0:27.884\t1\t16\t24 Nov 2025\t—\n411\t9\t0:32.456\t1\t11\t24 Nov 2025\t—\n399\t17\t0:17.046\t1\t23\t22 Nov 2025\t—\n445\t21\t0:23.801\t1\t39\t21 Nov 2025\t—\n382\t26\t0:23.427\t1\t34\t20 Nov 2025\t—\n395\t28\t0:20.831\t1\t29\t20 Nov 2025\t—\n381\t1\t0:24.619\t1\t21\t20 Nov 2025\t—\n388\t19\t0:39.040\t1\t25\t18 Nov 2025\t—\n427\t63\t0:22.144\t1\t81\t18 Nov 2025\t—\n416\t18\t0:14.781\t1\t83\t18 Nov 2025\t—\n393\t25\t0:16.629\t1\t35\t18 Nov 2025\t—\n398\t10\t1:00.562\t1\t10\t18 Nov 2025\t—\n401\t6\t0:14.627\t1\t42\t18 Nov 2025\t—\n421\t9\t0:35.393\t1\t36\t18 Nov 2025\t—\n390\t22\t0:12.462\t1\t25\t17 Nov 2025\t—\n430\t11\t0:20.801\t1\t43\t17 Nov 2025\t—\n385\t23\t0:24.799\t1\t23\t17 Nov 2025\t—\n408\t20\t0:21.168\t1\t36\t17 Nov 2025\t—\n409\t73\t3:14.769\t1\t74\t16 Nov 2025\t—\n383\t52\t0:43.204\t1\t53\t15 Nov 2025\t—\n412\t7\t0:26.329\t1\t98\t15 Nov 2025\t—\n425\t59\t0:18.900\t1\t73\t15 Nov 2025\t—\n407\t23\t1:02.819\t1\t64\t14 Nov 2025\t—\n419\t30\t0:27.113\t1\t40\t14 Nov 2025\t—\n436\t45\t0:25.918\t1\t73\t14 Nov 2025\t—\n392\t9\t0:18.177\t1\t58\t13 Nov 2025\t—\n420\t167\t0:29.288\t1\t180\t13 Nov 2025\t—\n413\t1\t0:20.201\t1\t70\t12 Nov 2025\t—\n389\t73\t0:34.109\t1\t75\t12 Nov 2025\t—\n432\t6\t0:21.184\t1\t143\t11 Nov 2025\t—\n449\t10\t0:11.808\t1\t49\t11 Nov 2025\t—\n402\t26\t0:19.072\t1\t163\t11 Nov 2025\t—\n386\t131\t0:27.243\t1\t136\t11 Nov 2025\t—\n424\t58\t0:31.570\t1\t93\t11 Nov 2025\t—\n428\t38\t0:14.751\t1\t42\t11 Nov 2025\t—\n437\t9\t0:20.170\t1\t272\t10 Nov 2025\t—\n397\t22\t0:27.308\t1\t196\t10 Nov 2025\t—\n417\t29\t0:16.041\t1\t55\t10 Nov 2025\t—\n442\t107\t0:15.881\t1\t141\t9 Nov 2025\t—\n400\t48\t0:29.839\t1\t79\t9 Nov 2025\t—\n415\t65\t0:15.252\t1\t97\t9 Nov 2025\t—\n435\t43\t0:18.663\t1\t79\t9 Nov 2025\t—\n403\t38\t0:34.405\t1\t67\t8 Nov 2025\t—\n446\t130\t0:32.726\t1\t197\t7 Nov 2025\t—\n377\t155\t0:25.669\t1\t655\t7 Nov 2025\t—\n429\t139\t0:09.501\t1\t204\t7 Nov 2025\t—\n450\t40\t1:34.277\t1\t338\t7 Nov 2025\t—\n440\t208\t0:12.447\t1\t314\t7 Nov 2025\t—\n422\t120\t0:25.194\t1\t142\t6 Nov 2025\t—\n394\t124\t0:13.622\t1\t208\t6 Nov 2025\t—\n378\t218\t0:26.657\t1\t284\t6 Nov 2025\t—\n379\t208\t2:37.162\t1\t208\t6 Nov 2025\t—\n376\t23\t0:25.575\t1\t775\t6 Nov 2025\t—\n438\t234\t0:12.454\t1\t423\t5 Nov 2025\t—\n410\t208\t0:22.199\t1\t234\t5 Nov 2025\t—\n380\t89\t0:19.819\t4\t1 316\t5 Nov 2025\t28 Nov 2025\n387\t632\t0:37.905\t2\t745\t4 Nov 2025\t—\n441\t42\t0:22.180\t1\t272\t4 Nov 2025\t—\n423\t637\t0:23.542\t1\t653\t4 Nov 2025\t—\n447\t182\t0:22.899\t1\t354\t3 Nov 2025\t—\n434\t262\t0:21.727\t1\t476\t3 Nov 2025\t—\n406\t414\t0:21.697\t1\t441\t3 Nov 2025\t—\n405\t28\t0:13.955\t1\t50\t3 Nov 2025\t—\n404\t793\t0:43.182\t1\t823\t3 Nov 2025\t—\n443\t433\t0:18.739\t1\t596\t3 Nov 2025\t—\n384\t—\t—\t—\t2\t—\t—\n391\t—\t—\t—\t8\t—\t—\n396\t—\t—\t—\t6\t—\t—\n418\t—\t—\t—\t12\t—\t—\n426\t—\t—\t—\t2\t—\t—\n431\t—\t—\t—\t1\t—\t—\n433\t—\t—\t—\t35\t—\t—\nIf you like this project, consider Ko-fi icon donating,\n\nor if you have coding skills  join the dev crew!\n\nKacky.gg","11":"Kacky Records Logo\nToggle theme\nUser Avatar\nHome\nSchedule\nHunting\nLeaderboard\nTop3\nMaps\nPlayers\nJxliano\nPlayer ID: 397\nPlayer Information\nBasic player data and event statistics\nPlayer Details\nPlayer ID\n397\nZone\nBaden-Württemberg, Stuttgart\nTotal Events Played\n7\nTotal Finishes\n245\nTotal Playtime\n1414h\nEvent Statistics\nAverage Rank\n25142.89\nPlaytime\n1414h\nCompleted Maps\n67\nPersonal Records & Missing Maps\nShowing latest finish first\nSelect an event to view map breakdown:\n\nKacky Reloaded 6 (KR)\n\n#\n\nRank\n\nPB\n\nFins\n\nTotal Fins\n\nFinished\n\nImproved\n439\t4\t0:24.316\t1\t13\t28 Nov 2025\t—\n418\t3\t0:27.042\t1\t12\t27 Nov 2025\t—\n448\t1\t0:18.488\t1\t16\t27 Nov 2025\t—\n399\t19\t0:17.106\t1\t23\t27 Nov 2025\t—\n381\t13\t0:27.225\t1\t21\t24 Nov 2025\t—\n414\t11\t0:28.159\t1\t16\t24 Nov 2025\t—\n405\t21\t0:13.471\t1\t50\t21 Nov 2025\t—\n382\t30\t0:23.698\t1\t34\t21 Nov 2025\t—\n449\t43\t0:16.698\t1\t49\t21 Nov 2025\t—\n390\t7\t0:09.935\t1\t25\t21 Nov 2025\t—\n428\t29\t0:13.112\t1\t42\t21 Nov 2025\t—\n433\t5\t0:16.339\t1\t35\t20 Nov 2025\t—\n445\t24\t0:23.836\t1\t39\t18 Nov 2025\t—\n393\t11\t0:16.325\t1\t35\t18 Nov 2025\t—\n421\t31\t0:56.201\t2\t36\t18 Nov 2025\t19 Nov 2025\n388\t21\t0:39.630\t1\t25\t17 Nov 2025\t—\n392\t47\t0:22.106\t1\t58\t15 Nov 2025\t—\n385\t10\t0:23.698\t2\t23\t15 Nov 2025\t—\n401\t8\t0:14.653\t1\t42\t15 Nov 2025\t—\n430\t31\t0:21.293\t1\t43\t15 Nov 2025\t—\n409\t12\t0:13.445\t1\t74\t14 Nov 2025\t—\n400\t45\t0:29.763\t1\t79\t14 Nov 2025\t—\n413\t11\t0:20.426\t1\t70\t12 Nov 2025\t—\n419\t6\t0:26.459\t1\t40\t12 Nov 2025\t—\n408\t25\t0:21.319\t1\t36\t12 Nov 2025\t—\n427\t47\t0:21.340\t1\t81\t11 Nov 2025\t—\n395\t16\t0:20.252\t1\t29\t11 Nov 2025\t—\n436\t40\t0:25.870\t1\t73\t11 Nov 2025\t—\n432\t38\t0:23.526\t1\t143\t11 Nov 2025\t—\n417\t22\t0:16.013\t1\t55\t10 Nov 2025\t—\n416\t63\t0:15.307\t1\t83\t10 Nov 2025\t—\n425\t33\t0:18.759\t1\t73\t10 Nov 2025\t—\n412\t93\t1:22.888\t1\t98\t10 Nov 2025\t—\n407\t31\t1:09.249\t1\t64\t9 Nov 2025\t—\n402\t4\t0:17.544\t1\t163\t9 Nov 2025\t—\n403\t25\t0:33.987\t1\t67\t9 Nov 2025\t—\n438\t95\t0:11.736\t1\t423\t9 Nov 2025\t—\n389\t54\t0:28.539\t1\t75\t9 Nov 2025\t—\n435\t7\t0:17.801\t1\t79\t8 Nov 2025\t—\n386\t74\t0:20.257\t1\t136\t7 Nov 2025\t—\n429\t72\t0:09.398\t1\t204\t7 Nov 2025\t—\n420\t52\t0:26.476\t6\t180\t7 Nov 2025\t19 Nov 2025\n378\t17\t0:25.231\t3\t284\t7 Nov 2025\t18 Nov 2025\n397\t147\t0:44.335\t1\t196\t6 Nov 2025\t—\n446\t68\t0:30.983\t1\t197\t6 Nov 2025\t—\n383\t3\t0:36.514\t1\t53\t6 Nov 2025\t—\n394\t118\t0:13.527\t1\t208\t6 Nov 2025\t—\n410\t80\t0:17.487\t1\t234\t5 Nov 2025\t—\n442\t61\t0:15.638\t1\t141\t5 Nov 2025\t—\n434\t127\t0:21.229\t1\t476\t5 Nov 2025\t—\n422\t79\t0:23.196\t1\t142\t5 Nov 2025\t—\n440\t219\t0:12.639\t1\t314\t5 Nov 2025\t—\n447\t270\t0:23.278\t2\t354\t5 Nov 2025\t29 Nov 2025\n441\t173\t0:22.700\t1\t272\t5 Nov 2025\t—\n380\t42\t0:18.898\t6\t1 317\t5 Nov 2025\t24 Nov 2025\n450\t227\t2:08.427\t1\t338\t4 Nov 2025\t—\n415\t88\t0:15.585\t1\t97\t4 Nov 2025\t—\n437\t176\t0:22.302\t1\t272\t4 Nov 2025\t—\n424\t8\t0:30.395\t1\t93\t4 Nov 2025\t—\n423\t227\t0:21.359\t1\t653\t4 Nov 2025\t—\n377\t314\t0:25.928\t1\t655\t4 Nov 2025\t—\n443\t161\t0:16.913\t1\t596\t4 Nov 2025\t—\n379\t9\t0:50.491\t1\t208\t4 Nov 2025\t—\n404\t35\t0:28.551\t2\t823\t3 Nov 2025\t29 Nov 2025\n406\t260\t0:19.527\t2\t441\t3 Nov 2025\t—\n376\t175\t0:25.787\t2\t775\t3 Nov 2025\t21 Nov 2025\n387\t7\t0:32.308\t13\t745\t3 Nov 2025\t27 Nov 2025\n384\t—\t—\t—\t2\t—\t—\n391\t—\t—\t—\t8\t—\t—\n396\t—\t—\t—\t6\t—\t—\n398\t—\t—\t—\t10\t—\t—\n411\t—\t—\t—\t11\t—\t—\n426\t—\t—\t—\t2\t—\t—\n431\t—\t—\t—\t1\t—\t—\n444\t—\t—\t—\t12\t—\t—\nIf you like this project, consider Ko-fi icon donating,\n\nor if you have coding skills  join the dev crew!\n\nKacky.gg"},"selectedDay":-1}; 
+
+    // --- DEFAULTS ---
+    const DEFAULT_PLAYERS = [
+        { id: 0, name: "SSanoTM", color: "#FF0055" },
+        { id: 1, name: "LinkMaxTm", color: "#00CCFF" },
+        { id: 2, name: "iiHugo", color: "#00FF99" },
+        { id: 3, name: "Samifying", color: "#FFFF00" },
+        { id: 4, name: "SileenzZ_", color: "#FF9900" },
+        { id: 5, name: "Tekky..", color: "#CC00FF" },
+        { id: 6, name: "nonickiNg", color: "#FF00CC" },
+        { id: 7, name: "zetos.", color: "#00FF00" },
+        { id: 8, name: "mikmos.", color: "#FFFFFF" },
+        { id: 9, name: "shieldbandit", color: "#8888FF" }
+    ];
+
+    // --- SMART DATE LOGIC ---
+    const today = new Date();
+    let maxDay = 30; 
+    if (today.getFullYear() === 2025 && today.getMonth() === 10) { 
+        maxDay = today.getDate();
+    }
+    const DAYS = Array.from({length: maxDay}, (_, i) => i + 1);
+
+    // Global State
+    let players = []; 
+    let playerData = {}; 
+    let chartInstance = null;
+    let selectedDay = -1; // To remember which day is selected
+
+    // --- INIT ---
+    function init() {
+        const inputCont = document.getElementById('inputsContainer');
+        const checkCont = document.getElementById('checkboxContainer');
+        const listCont = document.getElementById('detailsList');
+
+        // Init Chart First
+        initChart(); 
+
+        // Cleanup DOM
+        inputCont.innerHTML = '';
+        checkCont.innerHTML = '';
+        listCont.innerHTML = '<span class="empty-msg">Select a day on the graph to view the maps finished.</span>';
+
+        if (PRELOADED_STATE) {
+            // EXPORT MODE
+            document.body.classList.add('view-only');
+            players = PRELOADED_STATE.players || DEFAULT_PLAYERS;
+            if(PRELOADED_STATE.selectedDay) selectedDay = PRELOADED_STATE.selectedDay;
+            
+            players.forEach(p => {
+                if(PRELOADED_STATE.data && PRELOADED_STATE.data[p.id]) {
+                    renderPlayerUI(p);
+                    const txt = document.getElementById(`txt-${p.id}`);
+                    if(txt) {
+                        txt.value = PRELOADED_STATE.data[p.id];
+                        processInput(p.id, false);
+                    }
+                }
+            });
+            restoreToggles();
+        } else {
+            // GENERATOR MODE
+            const savedPlayers = localStorage.getItem('kacky_players_config');
+            if (savedPlayers) {
+                players = JSON.parse(savedPlayers);
+            } else {
+                players = JSON.parse(JSON.stringify(DEFAULT_PLAYERS));
+            }
+
+            // Restore last selected day
+            const savedDay = localStorage.getItem('kacky_selected_day');
+            if(savedDay) selectedDay = parseInt(savedDay);
+
+            players.forEach(p => renderPlayerUI(p));
+            restoreInputs();
+        }
+
+        updateChart();
+
+        // Restore the Details View if a day was previously selected
+        if(selectedDay !== -1) {
+            showDetails(selectedDay);
+        }
+    }
+
+    // --- UI RENDERING ---
+    function renderPlayerUI(p) {
+        const inputCont = document.getElementById('inputsContainer');
+        const checkCont = document.getElementById('checkboxContainer');
+
+        const div = document.createElement('div');
+        div.className = 'player-group';
+        div.innerHTML = `
+            <div class="player-header">
+                <span class="player-name" style="color:${p.color}">${p.name}</span>
+                <div class="player-info-right">
+                    <span class="player-stats" id="stats-${p.id}">0 finishes</span>
+                    <button class="btn-delete" onclick="deletePlayer(${p.id})" title="Remove Player">&times;</button>
+                </div>
+            </div>
+            <textarea id="txt-${p.id}" placeholder="Paste profile text here..." oninput="processInput(${p.id}, true)"></textarea>
+        `;
+        inputCont.appendChild(div);
+
+        const label = document.createElement('label');
+        label.className = 'cb-item';
+        label.id = `cb-label-${p.id}`;
+        label.innerHTML = `
+            <div class="cb-color" style="background:${p.color}"></div>
+            <input type="checkbox" id="cb-${p.id}" onchange="updateToggle(${p.id})" style="display:none">
+            ${p.name}
+        `;
+        checkCont.appendChild(label);
+    }
+
+    // --- CLIP OPENER LOGIC ---
+    async function openClip(element, mapId) {
+        element.classList.add('loading');
+        const originalText = element.innerText;
+        element.innerText = 'Fetching...';
+
+        const apiUrl = 'https://kacky.socr.am/api/twitch/clip/' + encodeURIComponent(mapId);
+        const proxiedUrl = 'https://corsproxy.io/?url=' + encodeURIComponent(apiUrl);
+
+        try {
+            const response = await fetch(proxiedUrl);
+            if (!response.ok) throw new Error('HTTP ' + response.status);
+
+            const text = await response.text();
+            const match = text.match(/https?:\/\/[^\s]+/);
+            
+            if (match && match[0]) {
+                window.open(match[0], '_blank');
+            } else {
+                alert("No clip URL found.\nAPI said: " + text);
+                window.open(apiUrl, '_blank');
+            }
+        } catch (e) {
+            console.error(e);
+            window.open(apiUrl, '_blank');
+        } finally {
+            element.classList.remove('loading');
+            element.innerText = originalText;
+        }
+    }
+
+    function showDetails(day) {
+        selectedDay = day; // Update State
+        if(!PRELOADED_STATE) localStorage.setItem('kacky_selected_day', day); // Save to LS
+
+        const header = document.getElementById('detailsHeader');
+        const list = document.getElementById('detailsList');
+        header.innerHTML = `Finishes on <span style="color:var(--accent)">Nov ${day}</span>`;
+        list.innerHTML = '';
+
+        let foundAny = false;
+        players.forEach(p => {
+            const cb = document.getElementById(`cb-${p.id}`);
+            if (cb && cb.checked && playerData[p.id]) {
+                const todaysMaps = playerData[p.id].filter(f => f.day === day);
+                if (todaysMaps.length > 0) {
+                    foundAny = true;
+                    const pContainer = document.createElement('div');
+                    pContainer.style.width = '100%';
+                    pContainer.style.marginBottom = '10px';
+                    pContainer.innerHTML = `<strong style="color:${p.color}; display:block; margin-bottom:5px;">${p.name} (+${todaysMaps.length})</strong>`;
+                    const mapFlex = document.createElement('div');
+                    mapFlex.style.display = 'flex';
+                    mapFlex.style.gap = '5px';
+                    mapFlex.style.flexWrap = 'wrap';
+                    
+                    todaysMaps.forEach(m => {
+                        const tag = document.createElement('div');
+                        tag.className = 'map-tag';
+                        tag.innerText = `Map ${m.map}`;
+                        tag.title = "Click to watch clip";
+                        tag.onclick = function() { openClip(this, m.map); };
+                        mapFlex.appendChild(tag);
+                    });
+                    
+                    pContainer.appendChild(mapFlex);
+                    list.appendChild(pContainer);
+                }
+            }
+        });
+        if (!foundAny) list.innerHTML = '<span class="empty-msg">No maps finished by selected players on this day.</span>';
+    }
+
+    // --- STANDARD LOGIC ---
+    function addCustomPlayer() {
+        const name = prompt("Enter player name:");
+        if (!name) return;
+        const newId = players.length > 0 ? Math.max(...players.map(p => p.id)) + 1 : 0;
+        const randomColor = `hsl(${Math.floor(Math.random() * 360)}, 100%, 70%)`;
+        const newPlayer = { id: newId, name: name, color: randomColor };
+        saveInputs();
+        players.push(newPlayer);
+        localStorage.setItem('kacky_players_config', JSON.stringify(players));
+        init();
+    }
+
+    function deletePlayer(id) {
+        if(!confirm("Are you sure you want to remove this player?")) return;
+        saveInputs(); 
+        players = players.filter(p => p.id !== id);
+        localStorage.setItem('kacky_players_config', JSON.stringify(players));
+        const savedInputs = JSON.parse(localStorage.getItem('kacky_gen_inputs') || '{}');
+        delete savedInputs[id];
+        localStorage.setItem('kacky_gen_inputs', JSON.stringify(savedInputs));
+        delete playerData[id];
+        init();
+    }
+
+    function updateToggle(id) {
+        const cb = document.getElementById(`cb-${id}`);
+        const lbl = document.getElementById(`cb-label-${id}`);
+        if (cb && cb.checked) lbl.classList.add('active');
+        else if (lbl) lbl.classList.remove('active');
+        saveToggles();
+        updateChart();
+        // Refresh details to show/hide this player's maps if a day is selected
+        if(selectedDay !== -1) showDetails(selectedDay);
+    }
+
+    function processInput(playerId, shouldSave = true) {
+        const txtEl = document.getElementById(`txt-${playerId}`);
+        if(!txtEl) return;
+        const text = txtEl.value;
+        const finishes = [];
+        const regex = /(3[7-9]\d|4[0-4]\d|450).*?(\d{1,5})\s(Nov|Dec)\s2025/g;
+        let match;
+        while ((match = regex.exec(text)) !== null) {
+            const mapId = parseInt(match[1]);
+            const numberCluster = match[2]; 
+            let day = -1;
+            if (numberCluster.length >= 2) {
+                const last2 = parseInt(numberCluster.slice(-2));
+                if (last2 >= 1 && last2 <= 30) day = last2;
+            }
+            if (day === -1) {
+                const last1 = parseInt(numberCluster.slice(-1));
+                if (last1 >= 1 && last1 <= 9) day = last1;
+            }
+            if (day !== -1 && !finishes.some(f => f.map === mapId)) {
+                finishes.push({ map: mapId, day: day });
+            }
+        }
+        finishes.sort((a, b) => a.day - b.day);
+        playerData[playerId] = finishes;
+        const statsEl = document.getElementById(`stats-${playerId}`);
+        if(statsEl) statsEl.innerText = `${finishes.length} finishes`;
+        if (shouldSave) {
+            const cb = document.getElementById(`cb-${playerId}`);
+            if (finishes.length > 0 && cb && !cb.checked) {
+                cb.checked = true;
+                updateToggle(playerId); 
+            }
+            saveInputs();
+        }
+        updateChart();
+        if(selectedDay !== -1) showDetails(selectedDay);
+    }
+
+    function saveInputs() {
+        if (PRELOADED_STATE) return;
+        const data = {};
+        players.forEach(p => {
+            const el = document.getElementById(`txt-${p.id}`);
+            if (el && el.value) data[p.id] = el.value;
+        });
+        localStorage.setItem('kacky_gen_inputs', JSON.stringify(data));
+    }
+
+    function restoreInputs() {
+        const saved = localStorage.getItem('kacky_gen_inputs');
+        if (saved) {
+            const data = JSON.parse(saved);
+            Object.keys(data).forEach(id => {
+                const numericId = parseInt(id);
+                if(players.some(p => p.id === numericId)) {
+                    const el = document.getElementById(`txt-${numericId}`);
+                    if (el) {
+                        el.value = data[id];
+                        processInput(numericId, false);
+                    }
+                }
+            });
+            restoreToggles();
+        }
+    }
+
+    function saveToggles() {
+        const checkedIds = [];
+        players.forEach(p => {
+            const el = document.getElementById(`cb-${p.id}`);
+            if (el && el.checked) checkedIds.push(p.id);
+        });
+        localStorage.setItem('kacky_view_toggles', JSON.stringify(checkedIds));
+    }
+
+    function restoreToggles() {
+        const saved = localStorage.getItem('kacky_view_toggles');
+        if (saved) {
+            const ids = JSON.parse(saved);
+            players.forEach(p => {
+                const el = document.getElementById(`cb-${p.id}`);
+                if (el) {
+                    el.checked = ids.includes(p.id);
+                    const lbl = document.getElementById(`cb-label-${p.id}`);
+                    if(el.checked) lbl.classList.add('active');
+                    else lbl.classList.remove('active');
+                }
+            });
+            updateChart();
+        }
+    }
+
+    function initChart() {
+        const ctx = document.getElementById('kackyChart').getContext('2d');
+        chartInstance = new Chart(ctx, {
+            type: 'line',
+            data: { labels: DAYS.map(d => `Nov ${d}`), datasets: [] },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    tooltip: {
+                        position: 'nearest',
+                        callbacks: { footer: () => "Click map to watch clip" }
+                    },
+                    legend: { display: false }
+                },
+                scales: {
+                    y: { beginAtZero: true, max: 75, grid: { color: '#333' }, title: { display: true, text: 'Total Maps Finished' } },
+                    x: { grid: { color: '#333' } }
+                },
+                onClick: (e, elements) => {
+                    if (elements.length > 0) showDetails(elements[0].index + 1);
+                }
+            }
+        });
+    }
+
+    function updateChart() {
+        if (!chartInstance) return;
+        const datasets = [];
+        players.forEach(p => {
+            const cb = document.getElementById(`cb-${p.id}`);
+            if (cb && cb.checked && playerData[p.id]) {
+                const finishes = playerData[p.id];
+                const dataPoints = [];
+                let cumulative = 0;
+                for (let d = 1; d <= maxDay; d++) {
+                    cumulative += finishes.filter(f => f.day === d).length;
+                    dataPoints.push(cumulative);
+                }
+                datasets.push({
+                    label: p.name,
+                    data: dataPoints,
+                    borderColor: p.color,
+                    backgroundColor: p.color,
+                    tension: 0.1,
+                    pointRadius: 4,
+                    pointHoverRadius: 6,
+                    borderWidth: 2
+                });
+            }
+        });
+        chartInstance.data.datasets = datasets;
+        chartInstance.update();
+    }
+
+    function exportToHTML() {
+        const currentData = {};
+        players.forEach(p => {
+            const el = document.getElementById(`txt-${p.id}`);
+            if(el && el.value && el.value.trim() !== "") {
+                currentData[p.id] = el.value;
+            }
+        });
+
+        if (Object.keys(currentData).length === 0) {
+            alert("No data to save!");
+            return;
+        }
+
+        const exportState = { 
+            players: players, 
+            data: currentData,
+            selectedDay: selectedDay // Save the currently selected day
+        };
+
+        const htmlContent = document.documentElement.outerHTML;
+        const jsonString = JSON.stringify(exportState);
+        const searchString = "const PRELOADED_STATE = null;";
+        const replaceString = `const PRELOADED_STATE = ${jsonString};`;
+        
+        if (!htmlContent.includes(searchString)) {
+            alert("Error: Could not find insertion point.");
+            return;
+        }
+
+        const newHtml = htmlContent.replace(searchString, replaceString);
+        const blob = new Blob([newHtml], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'kacky_reloaded_6_final.html';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
+    function loadExample() {
+        const ssanoData = `38410:21.0131126 Nov 2025—433200:29.95713025 Nov 2025—39630:26.7271322 Nov 2025—44430:18.3381821 Nov 2025—43990:38.46011121 Nov 2025—44810:19.03911220 Nov 2025—41810:26.9751819 Nov 2025—39140:19.3621618 Nov 2025—41130:29.4661917 Nov 2025—399130:16.98811917 Nov 2025—414120:28.20911516 Nov 2025—385110:23.71812215 Nov 2025—421301:14.43513215 Nov 2025—382230:23.70712614 Nov 2025—38120:24.77711914 Nov 2025—405430:16.22914913 Nov 2025—388120:36.16112213 Nov 2025—392510:22.61115512 Nov 2025—395120:20.21912912 Nov 2025—445340:24.34513412 Nov 2025—436330:25.83516712 Nov 2025—449370:16.20714511 Nov 2025—408210:21.26813411 Nov 2025—389310:24.83917011 Nov 2025—40030:27.98817411 Nov 2025—383190:38.42215211 Nov 2025—39080:10.28512410 Nov 2025—393340:17.58213510 Nov 2025—417510:16.7041539 Nov 2025—4461320:32.87311949 Nov 2025—419180:26.7491389 Nov 2025—413190:20.4761659 Nov 2025—412690:46.0221899 Nov 2025—403420:34.4581658 Nov 2025—425110:18.6091708 Nov 2025—38630:17.79821278 Nov 202526 Nov 202543080:20.7441408 Nov 2025—43540:17.5201748 Nov 2025—401380:15.3631417 Nov 2025—422470:22.71211357 Nov 2025—424880:57.5391897 Nov 2025—407211:02.3491597 Nov 2025—420640:26.90111756 Nov 2025—4101550:19.80612286 Nov 2025—409640:15.7271716 Nov 2025—428150:12.6141416 Nov 2025—378860:25.72112816 Nov 2025—416470:15.0901786 Nov 2025—42720:19.4061766 Nov 2025—415760:15.4491926 Nov 2025—4021280:23.38311565 Nov 2025—4421060:15.97511315 Nov 2025—4291740:09.70411905 Nov 2025—43830:11.06214105 Nov 2025—380460:19.09721 2995 Nov 202521 Nov 2025394230:12.82812024 Nov 2025—4321310:28.15811384 Nov 2025—3877060:39.90417244 Nov 2025—441550:22.24552684 Nov 202526 Nov 2025404190:28.10228034 Nov 202526 Nov 20254371810:22.71812614 Nov 2025—3971190:33.89111904 Nov 2025—3772170:25.79416384 Nov 2025—44010:11.25443034 Nov 202525 Nov 20253791490:53.36712044 Nov 2025—450141:24.51413254 Nov 2025—44760:21.87613373 Nov 2025—443280:15.92925773 Nov 202525 Nov 2025376510:25.67217633 Nov 2025—406180:18.25434353 Nov 202524 Nov 20254341770:21.43214673 Nov 2025—42330:20.714226423 Nov 202525 Nov 2025`;
+        const txt = document.getElementById('txt-0');
+        if(txt) {
+            txt.value = ssanoData;
+            processInput(0);
+        }
+    }
+
+    init();
+</script>
+
+</body></html>
